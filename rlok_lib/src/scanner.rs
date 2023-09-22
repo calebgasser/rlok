@@ -1,9 +1,9 @@
-use super::error_handler::ErrorHandler;
+use super::error_handler::BaseError;
 use super::tokens::{Token, TokenType};
+use color_eyre::eyre::{Report, Result};
 use std::collections::HashMap;
 
 pub struct Scanner {
-    error_handler: ErrorHandler,
     source: String,
     start: i32,
     current: i32,
@@ -14,7 +14,6 @@ pub struct Scanner {
 
 impl Scanner {
     pub fn build(source: String) -> Self {
-        let error_handler = ErrorHandler::build();
         let mut keywords = HashMap::new();
         keywords.insert("and".into(), TokenType::AND);
         keywords.insert("class".into(), TokenType::CLASS);
@@ -33,7 +32,6 @@ impl Scanner {
         keywords.insert("var".into(), TokenType::VAR);
         keywords.insert("while".into(), TokenType::WHILE);
         Scanner {
-            error_handler,
             source,
             start: 0,
             current: 0,
@@ -43,14 +41,14 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) -> Result<Vec<Token>> {
         while !self.is_end() {
             self.start = self.current;
-            self.scan_token();
+            self.scan_token()?;
         }
         self.tokens
             .push(Token::new(TokenType::EOF, "".into(), None, self.line));
-        self.tokens.clone()
+        Ok(self.tokens.clone())
     }
 
     fn is_end(&self) -> bool {
@@ -108,7 +106,7 @@ impl Scanner {
             .unwrap()
     }
 
-    fn string(&mut self) {
+    fn string(&mut self) -> Result<()> {
         while self.peek() != '"' && !self.is_end() {
             if self.peek() == '\n' {
                 self.line += 1;
@@ -117,12 +115,16 @@ impl Scanner {
         }
 
         if self.is_end() {
-            self.error_handler.error(self.line, "Unterminated string.");
+            Err(Report::new(BaseError::LineError {
+                line: self.line,
+                message: "Unterminated string.".into(),
+            }))
         } else {
             self.advance();
 
             let value = &self.source[(self.start + 1) as usize..(self.current - 1) as usize];
             self.add_token_val(TokenType::StringLit, &value.to_string());
+            Ok(())
         }
     }
 
@@ -165,7 +167,7 @@ impl Scanner {
         Self::is_alpha(c) || Self::is_digit(c)
     }
 
-    fn scan_token(&mut self) {
+    fn scan_token(&mut self) -> Result<()> {
         let c: char = self.advance();
         match c {
             '(' => self.add_token(TokenType::LeftParen),
@@ -215,7 +217,7 @@ impl Scanner {
                     self.add_token(TokenType::Slash)
                 }
             }
-            '"' => self.string(),
+            '"' => self.string()?,
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
             _ => {
@@ -224,9 +226,13 @@ impl Scanner {
                 } else if Self::is_alpha(c) {
                     self.identifier();
                 } else {
-                    self.error_handler.error(self.line, "Unexpected token");
+                    return Err(Report::new(BaseError::LineError {
+                        line: self.line,
+                        message: "Unexpected token".into(),
+                    }));
                 }
             }
         }
+        Ok(())
     }
 }

@@ -1,18 +1,13 @@
-pub struct ErrorHandler {
-    has_error: bool,
-}
+use thiserror::Error;
 
-impl ErrorHandler {
-    pub fn build() -> Self {
-        ErrorHandler { has_error: false }
-    }
-
-    pub fn error(&mut self, line: i32, message: &str) {
-        self.has_error = true;
-        self.report(line, String::from(""), message);
-    }
-
-    fn report(&self, line: i32, location: String, message: &str) {
-        println!("[line {line}] Error {location}: {message}");
-    }
+#[derive(Error, Debug)]
+pub enum BaseError {
+    #[error("[line {line:?}] Error: {message:?}")]
+    LineError { line: i32, message: String },
+    #[error("[line {line:?}] Error  at {location:?}: {message:?}")]
+    TokenError {
+        line: i32,
+        location: String,
+        message: String,
+    },
 }

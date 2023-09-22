@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     // Signel-character tokens
     LeftParen,
@@ -51,10 +51,10 @@ pub enum TokenType {
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    ty: TokenType,
-    lexeme: String,
-    literal: Option<String>,
-    line: i32,
+    pub ty: TokenType,
+    pub lexeme: String,
+    pub literal: Option<String>,
+    pub line: i32,
 }
 
 impl Token {
@@ -64,6 +64,16 @@ impl Token {
             lexeme,
             literal,
             line,
+        }
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Some(ref lit) = self.literal {
+            write!(f, "{}", lit)
+        } else {
+            write!(f, "{}", self.lexeme)
         }
     }
 }
