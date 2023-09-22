@@ -13,7 +13,8 @@ use color_eyre::eyre::{Report, Result};
 // operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
 //                | "+"  | "-"  | "*" | "/" ;
 // ---------------------------------------------------------------
-// expression     → equality ;
+// expression     → comma ;
+// comma          → equality ( "," equality )*;
 // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           → factor ( ( "-" | "+" ) factor )* ;
@@ -48,8 +49,8 @@ impl std::fmt::Display for Expr {
                 left,
                 operator,
                 right,
-            } => write!(f, "({} {} {})", left, operator, right),
-            Expr::Grouping { expression } => write!(f, "({})", expression),
+            } => write!(f, "Binary( {} {} {} )", left, operator, right),
+            Expr::Grouping { expression } => write!(f, "Grouping( {} )", expression),
             Expr::Literal { value } => {
                 if let Some(val) = value {
                     write!(f, "{:?}", val)
@@ -57,7 +58,7 @@ impl std::fmt::Display for Expr {
                     write!(f, "VALUE_MISSING")
                 }
             }
-            Expr::Unary { operator, right } => write!(f, "({} {})", operator, right),
+            Expr::Unary { operator, right } => write!(f, "Unary( {} {} )", operator, right),
         }
     }
 }
@@ -133,9 +134,27 @@ impl Parser {
         }
         Ok(None)
     }
-    // expression     → equality ;
+    // expression     → comma ;
     fn expression(&mut self) -> Result<Option<Expr>> {
-        if let Some(expr) = self.equality()? {
+        if let Some(expr) = self.comma()? {
+            return Ok(Some(expr));
+        }
+        Ok(None)
+    }
+
+    // comma          → equality ( "," equality )*;
+    fn comma(&mut self) -> Result<Option<Expr>> {
+        if let Some(mut expr) = self.equality()? {
+            while self.match_type(vec![TokenType::Comma]) {
+                let operator = self.previous();
+                if let Some(right) = self.equality()? {
+                    expr = Expr::Binary {
+                        left: Box::new(expr),
+                        operator,
+                        right: Box::new(right),
+                    }
+                }
+            }
             return Ok(Some(expr));
         }
         Ok(None)
@@ -234,7 +253,7 @@ impl Parser {
         Ok(None)
     }
     // primary        → NUMBER | STRING | "true" | "false" | "nil"
-    //                | "(" expression ")" ;
+    //                | "(" expression ")";
     fn primary(&mut self) -> Result<Option<Expr>> {
         if self.match_type(vec![TokenType::FALSE]) {
             return Ok(Some(Expr::Literal {
@@ -265,6 +284,7 @@ impl Parser {
                 }));
             }
         }
+
         let token = self.peek();
         if matches!(token.ty, TokenType::EOF) {
             Ok(None)
