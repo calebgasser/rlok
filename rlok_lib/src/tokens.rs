@@ -73,9 +73,9 @@ impl Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(ref lit) = self.literal {
-            write!(f, "{}({:?})", lit, self.ty)
+            write!(f, "{}", lit)
         } else {
-            write!(f, "{}({:?})", self.lexeme, self.ty)
+            write!(f, "{}", self.lexeme)
         }
     }
 }

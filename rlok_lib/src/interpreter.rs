@@ -18,7 +18,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn build() -> Self {
         Interpreter {
-            environment: Environment::new(),
+            environment: Environment::new(None),
         }
     }
 
@@ -40,7 +40,11 @@ impl Interpreter {
                 if let Some(ast) = ast {
                     for stmt in &ast {
                         match self.evaluate_statement(stmt.clone()) {
-                            Ok(_output) => (),
+                            Ok(output) => {
+                                if let Some(out) = output {
+                                    Self::print_lit(out);
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("{}", e);
                             }
@@ -191,23 +195,43 @@ impl Interpreter {
         Err(Report::new(RuntimeError::UnexpectedStatement(stmt)))
     }
 
-    fn evaluate_statement(&mut self, stmt: Statement) -> Result<()> {
+    fn execute_block(
+        &mut self,
+        statements: Vec<Box<Statement>>,
+        environment: Environment,
+    ) -> Result<()> {
+        let previous = self.environment.clone();
+        self.environment = environment;
+        for stmt in statements {
+            self.evaluate_statement(*stmt)?;
+        }
+        self.environment = previous;
+        Ok(())
+    }
+
+    fn evaluate_statement(&mut self, stmt: Statement) -> Result<Option<LitType>> {
         match stmt.clone() {
             Statement::Print { expression } => {
                 let value = self.evaluate_expr(expression)?;
                 Self::print_lit(value);
-                Ok(())
+                Ok(None)
             }
             Statement::Expression { expression } => {
-                self.evaluate_expr(expression)?;
-                Ok(())
+                return Ok(Some(self.evaluate_expr(expression)?));
             }
             Statement::Var {
                 name: _,
                 expression: _,
             } => {
                 self.var_statement(stmt)?;
-                return Ok(());
+                return Ok(None);
+            }
+            Statement::Block { statements } => {
+                self.execute_block(
+                    statements,
+                    Environment::new(Some(Box::new(self.environment.clone()))),
+                )?;
+                Ok(None)
             }
         }
     }

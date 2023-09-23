@@ -38,7 +38,7 @@ impl std::fmt::Display for Expr {
             Expr::Grouping { expression } => write!(f, "( {} )", expression),
             Expr::Literal { value } => {
                 if let Some(val) = value {
-                    write!(f, "{:?}", val)
+                    write!(f, "{}", val)
                 } else {
                     write!(f, "VALUE_MISSING")
                 }

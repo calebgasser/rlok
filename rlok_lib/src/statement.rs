@@ -13,6 +13,9 @@ pub enum Statement {
         name: Token,
         expression: Option<Expr>,
     },
+    Block {
+        statements: Vec<Box<Statement>>,
+    },
 }
 
 impl std::fmt::Display for Statement {
@@ -21,6 +24,7 @@ impl std::fmt::Display for Statement {
             Statement::Expression { expression } => write!(f, "( {} )", expression),
             Statement::Print { expression } => write!(f, "{}", expression),
             Statement::Var { name, expression } => write!(f, "( {} = {:?} )", name, expression),
+            Statement::Block { statements } => write!(f, "{{ {:?} }}", statements),
         }
     }
 }

@@ -53,7 +53,7 @@ impl Parser {
         if self.check(ty) {
             Ok(self.advance())
         } else {
-            let token = self.peek();
+            let token = self.previous();
             Err(Report::new(ParserError::ConsumeTokenError {
                 line: token.line,
                 location: token.lexeme,
@@ -125,9 +125,24 @@ impl Parser {
     fn statement(&mut self) -> Result<Option<Statement>> {
         if self.match_type(vec![TokenType::PRINT]) {
             self.print_statement()
+        } else if self.match_type(vec![TokenType::LeftBrace]) {
+            return Ok(Some(Statement::Block {
+                statements: self.block_statement()?,
+            }));
         } else {
             self.expression_statement()
         }
+    }
+
+    fn block_statement(&mut self) -> Result<Vec<Box<Statement>>> {
+        let mut statements: Vec<Box<Statement>> = Vec::new();
+        while !self.check(TokenType::RightBrace) && !self.is_end() {
+            if let Some(dec) = self.declaration()? {
+                statements.push(Box::new(dec));
+            }
+        }
+        let _ = self.consume(TokenType::RightBrace, "Expected '}' after block.")?;
+        Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Option<Statement>> {

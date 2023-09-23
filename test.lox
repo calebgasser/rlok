@@ -1,10 +1,19 @@
-print "Starting...";
-var cat = 10 + 2;
-print "Cat";
-print cat;
-var dog = 20;
-print "Dog";
-print dog;
-print "Cat + Dog is";
-print cat + dog;
-print "Done!";
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+  var a = "outer a";
+  var b = "outer b";
+  {
+    var a = "inner a";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
+}
+print a;
+print b;
+print c;
