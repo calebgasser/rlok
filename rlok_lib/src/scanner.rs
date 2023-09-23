@@ -1,4 +1,4 @@
-use super::error_handler::BaseError;
+use super::error_handler::ScannerError;
 use super::tokens::{Token, TokenType};
 use color_eyre::eyre::{Report, Result};
 use std::collections::HashMap;
@@ -115,7 +115,7 @@ impl Scanner {
         }
 
         if self.is_end() {
-            Err(Report::new(BaseError::LineError {
+            Err(Report::new(ScannerError::StringError {
                 line: self.line,
                 message: "Unterminated string.".into(),
             }))
@@ -226,7 +226,7 @@ impl Scanner {
                 } else if Self::is_alpha(c) {
                     self.identifier();
                 } else {
-                    return Err(Report::new(BaseError::LineError {
+                    return Err(Report::new(ScannerError::UnexpectedTokenError {
                         line: self.line,
                         message: "Unexpected token".into(),
                     }));

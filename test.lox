@@ -1,3 +1,10 @@
-// Test
-var cat = 32
-print cat
+print "Starting...";
+var cat = 10 + 2;
+print "Cat";
+print cat;
+var dog = 20;
+print "Dog";
+print dog;
+print "Cat + Dog is";
+print cat + dog;
+print "Done!";

@@ -1,4 +1,7 @@
-use super::error_handler::BaseError;
+use super::error_handler::ParserError;
+use super::expression::Expr;
+use super::lit::LitType;
+use super::statement::Statement;
 use super::tokens::{Token, TokenType};
 use color_eyre::eyre::{Report, Result};
 
@@ -14,7 +17,7 @@ use color_eyre::eyre::{Report, Result};
 //                | "+"  | "-"  | "*" | "/" ;
 // ---------------------------------------------------------------
 // expression     → comma ;
-// comma          → equality ( "," equality )*;
+// comma          → comparison ( "," comparison )*;
 // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           → factor ( ( "-" | "+" ) factor )* ;
@@ -23,45 +26,6 @@ use color_eyre::eyre::{Report, Result};
 //                | primary ;
 // primary        → NUMBER | STRING | "true" | "false" | "nil"
 //                | "(" expression ")" ;
-
-pub enum Expr {
-    Binary {
-        left: Box<Expr>,
-        operator: Token,
-        right: Box<Expr>,
-    },
-    Grouping {
-        expression: Box<Expr>,
-    },
-    Literal {
-        value: Option<String>,
-    },
-    Unary {
-        operator: Token,
-        right: Box<Expr>,
-    },
-}
-
-impl std::fmt::Display for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Expr::Binary {
-                left,
-                operator,
-                right,
-            } => write!(f, "Binary( {} {} {} )", left, operator, right),
-            Expr::Grouping { expression } => write!(f, "Grouping( {} )", expression),
-            Expr::Literal { value } => {
-                if let Some(val) = value {
-                    write!(f, "{:?}", val)
-                } else {
-                    write!(f, "VALUE_MISSING")
-                }
-            }
-            Expr::Unary { operator, right } => write!(f, "Unary( {} {} )", operator, right),
-        }
-    }
-}
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -85,13 +49,12 @@ impl Parser {
         matches!(self.peek().ty, TokenType::EOF)
     }
 
-    fn consume(&mut self, ty: TokenType, error_message: &str) -> Result<()> {
+    fn consume(&mut self, ty: TokenType, error_message: &str) -> Result<Token> {
         if self.check(ty) {
-            self.advance();
-            Ok(())
+            Ok(self.advance())
         } else {
             let token = self.peek();
-            Err(Report::new(BaseError::TokenError {
+            Err(Report::new(ParserError::ConsumeTokenError {
                 line: token.line,
                 location: token.lexeme,
                 message: error_message.into(),
@@ -110,17 +73,13 @@ impl Parser {
         if self.is_end() {
             false
         } else {
-            if self.peek().ty == ty {
-                true
-            } else {
-                false
-            }
+            return self.peek().ty == ty;
         }
     }
 
     fn match_type(&mut self, types: Vec<TokenType>) -> bool {
         for ty in types {
-            if self.check(ty) {
+            if self.check(ty.clone()) {
                 self.advance();
                 return true;
             }
@@ -128,12 +87,65 @@ impl Parser {
         false
     }
 
-    pub fn parse(&mut self) -> Result<Option<Expr>> {
-        if let Some(expr) = self.expression()? {
-            return Ok(Some(expr));
+    pub fn parse(&mut self) -> Result<Option<Vec<Statement>>> {
+        let mut statements: Vec<Statement> = Vec::new();
+        while !self.is_end() {
+            if let Some(dec) = self.declaration()? {
+                statements.push(dec.clone());
+            }
         }
-        Ok(None)
+        Ok(Some(statements))
     }
+
+    fn declaration(&mut self) -> Result<Option<Statement>> {
+        if self.match_type(vec![TokenType::VAR]) {
+            return self.var_declaration();
+        }
+        self.statement()
+    }
+
+    fn var_declaration(&mut self) -> Result<Option<Statement>> {
+        let name = self.consume(TokenType::Ident, "Expected variable name.")?;
+        if self.match_type(vec![TokenType::Equal]) {
+            if let Some(expr) = self.expression()? {
+                let _ = self.consume(
+                    TokenType::Semicolon,
+                    "Expect ';' after variable declaration.",
+                )?;
+                return Ok(Some(Statement::Var {
+                    name,
+                    expression: Some(expr),
+                }));
+            }
+            return Err(Report::new(ParserError::VarMissingExpr(name)));
+        }
+        Err(Report::new(ParserError::VarDeclartionError))
+    }
+
+    fn statement(&mut self) -> Result<Option<Statement>> {
+        if self.match_type(vec![TokenType::PRINT]) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    fn print_statement(&mut self) -> Result<Option<Statement>> {
+        if let Some(expr) = self.expression()? {
+            let _ = self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+            return Ok(Some(Statement::Print { expression: expr }));
+        }
+        Err(Report::new(ParserError::PrintNoExpression))
+    }
+
+    fn expression_statement(&mut self) -> Result<Option<Statement>> {
+        if let Some(expr) = self.expression()? {
+            let _ = self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+            return Ok(Some(Statement::Expression { expression: expr }));
+        }
+        Err(Report::new(ParserError::ExpressionNoExpression))
+    }
+
     // expression     → comma ;
     fn expression(&mut self) -> Result<Option<Expr>> {
         if let Some(expr) = self.comma()? {
@@ -144,10 +156,10 @@ impl Parser {
 
     // comma          → equality ( "," equality )*;
     fn comma(&mut self) -> Result<Option<Expr>> {
-        if let Some(mut expr) = self.equality()? {
+        if let Some(mut expr) = self.assignment()? {
             while self.match_type(vec![TokenType::Comma]) {
                 let operator = self.previous();
-                if let Some(right) = self.equality()? {
+                if let Some(right) = self.assignment()? {
                     expr = Expr::Binary {
                         left: Box::new(expr),
                         operator,
@@ -160,17 +172,37 @@ impl Parser {
         Ok(None)
     }
 
+    fn assignment(&mut self) -> Result<Option<Expr>> {
+        if let Some(expr) = self.equality()? {
+            if self.match_type(vec![TokenType::Equal]) {
+                let equals = self.previous();
+                if let Some(value) = self.assignment()? {
+                    if let Expr::Variable { name } = expr {
+                        return Ok(Some(Expr::Assign {
+                            name,
+                            value: Box::new(value),
+                        }));
+                    }
+                    return Err(Report::new(ParserError::UnexpectedAssignmentTarget(equals)));
+                }
+                return Err(Report::new(ParserError::InvalidAssignmentTarget(equals)));
+            }
+            return Ok(Some(expr));
+        }
+        Ok(None)
+    }
+
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
     fn equality(&mut self) -> Result<Option<Expr>> {
-        if let Some(mut expr) = self.comparison()? {
+        if let Some(expr) = self.comparison()? {
             while self.match_type(vec![TokenType::BangEqual, TokenType::EqualEqual]) {
                 let operator = self.previous();
                 if let Some(right) = self.comparison()? {
-                    expr = Expr::Binary {
+                    return Ok(Some(Expr::Binary {
                         left: Box::new(expr),
                         operator,
                         right: Box::new(right),
-                    };
+                    }));
                 }
             }
             return Ok(Some(expr));
@@ -257,22 +289,29 @@ impl Parser {
     fn primary(&mut self) -> Result<Option<Expr>> {
         if self.match_type(vec![TokenType::FALSE]) {
             return Ok(Some(Expr::Literal {
-                value: Some("false".into()),
+                value: Some(LitType::Bool(false)),
             }));
         }
         if self.match_type(vec![TokenType::TRUE]) {
             return Ok(Some(Expr::Literal {
-                value: Some("true".into()),
+                value: Some(LitType::Bool(true)),
             }));
         }
         if self.match_type(vec![TokenType::NIL]) {
             return Ok(Some(Expr::Literal {
-                value: Some("nil".into()),
+                value: Some(LitType::Nil),
             }));
         }
-        if self.match_type(vec![TokenType::NumberLit, TokenType::StringLit]) {
+        if self.match_type(vec![TokenType::NumberLit]) {
             return Ok(Some(Expr::Literal {
-                value: self.previous().literal,
+                value: Some(LitType::Float(
+                    self.previous().literal.unwrap().parse::<f32>().unwrap(),
+                )),
+            }));
+        }
+        if self.match_type(vec![TokenType::StringLit]) {
+            return Ok(Some(Expr::Literal {
+                value: Some(LitType::Str(self.previous().literal.unwrap())),
             }));
         }
 
@@ -285,11 +324,17 @@ impl Parser {
             }
         }
 
+        if self.match_type(vec![TokenType::Ident]) {
+            return Ok(Some(Expr::Variable {
+                name: self.previous(),
+            }));
+        }
+
         let token = self.peek();
         if matches!(token.ty, TokenType::EOF) {
             Ok(None)
         } else {
-            Err(Report::new(BaseError::TokenError {
+            Err(Report::new(ParserError::PrimaryTokenError {
                 line: token.line,
                 location: token.lexeme,
                 message: "Expected expression.".into(),

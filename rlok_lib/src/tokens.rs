@@ -12,6 +12,8 @@ pub enum TokenType {
     Semicolon,
     Slash,
     Star,
+    // Colon,
+    // Question,
 
     // One or two character tokens
     Bang,
@@ -71,9 +73,9 @@ impl Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(ref lit) = self.literal {
-            write!(f, "{}", lit)
+            write!(f, "{}({:?})", lit, self.ty)
         } else {
-            write!(f, "{}", self.lexeme)
+            write!(f, "{}({:?})", self.lexeme, self.ty)
         }
     }
 }
