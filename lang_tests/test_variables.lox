@@ -1,0 +1,8 @@
+var big = 100;
+var small = 10;
+print "Variable big is";
+print big;
+print "Variable small is";
+print small;
+print "Variable big + small is";
+print big + small;
