@@ -21,6 +21,10 @@ pub enum Statement {
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
+    While {
+        condition: Expr,
+        body: Box<Statement>,
+    },
 }
 
 impl std::fmt::Display for Statement {
@@ -44,6 +48,9 @@ impl std::fmt::Display for Statement {
                 } else {
                     write!(f, "{{ if {} then {} }}", condition, then_branch)
                 }
+            }
+            Statement::While { condition, body } => {
+                write!(f, "{{ while {} do {} }}", condition, body)
             }
         }
     }

@@ -37,7 +37,7 @@ impl Interpreter {
     fn run(&mut self, contents: String) -> Result<()> {
         let mut scanner = Scanner::build(contents);
         let tokens = scanner.scan_tokens()?;
-        let mut parser = Parser::new(tokens.clone())?;
+        let mut parser = Parser::new(tokens.clone(), true)?;
         match parser.parse() {
             Ok(ast) => {
                 if let Some(ast) = ast {
@@ -150,7 +150,9 @@ impl Interpreter {
                             }
                         }
                         TokenType::Star => return Ok(LitType::Float(l * r)),
-                        _ => return Err(Report::new(RuntimeError::InvalidNumerical(expr))),
+                        _ => {
+                            return Err(Report::new(RuntimeError::InvalidNumerical(expr, operator)))
+                        }
                     }
                 }
             }
@@ -221,6 +223,13 @@ impl Interpreter {
             LitType::Bool(bl) => bl,
             LitType::Nil => false,
         }
+    }
+
+    fn while_statement(&mut self, condition: Expr, body: Statement) -> Result<()> {
+        while Self::is_truthy(self.evaluate_expr(condition.clone())?) {
+            self.evaluate_statement(body.clone())?;
+        }
+        Ok(())
     }
 
     fn if_statement(
@@ -299,6 +308,10 @@ impl Interpreter {
                 } else {
                     self.if_statement(condition, *then_branch, None)?;
                 }
+                Ok(None)
+            }
+            Statement::While { condition, body } => {
+                self.while_statement(condition, *body)?;
                 Ok(None)
             }
         }

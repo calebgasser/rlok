@@ -30,11 +30,16 @@ use color_eyre::eyre::{Report, Result};
 pub struct Parser {
     tokens: Vec<Token>,
     current: i32,
+    debug: bool,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Result<Self> {
-        Ok(Parser { tokens, current: 0 })
+    pub fn new(tokens: Vec<Token>, debug: bool) -> Result<Self> {
+        Ok(Parser {
+            tokens,
+            current: 0,
+            debug,
+        })
     }
 
     fn peek(&self) -> Token {
@@ -90,6 +95,19 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Option<Vec<Statement>>> {
         let mut statements: Vec<Statement> = Vec::new();
         while !self.is_end() {
+            match self.declaration() {
+                Ok(declaration) => {
+                    if let Some(dec) = declaration {
+                        if self.debug {
+                            println!("{:#?}", dec);
+                        }
+                        statements.push(dec.clone())
+                    }
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
             if let Some(dec) = self.declaration()? {
                 statements.push(dec.clone());
             }
@@ -119,7 +137,16 @@ impl Parser {
             }
             return Err(Report::new(ParserError::VarMissingExpr(name)));
         }
-        Err(Report::new(ParserError::VarDeclartionError))
+        let _ = self.consume(
+            TokenType::Semicolon,
+            "Expected ';' after unintialized variable.",
+        )?;
+        return Ok(Some(Statement::Var {
+            name,
+            expression: Some(Expr::Literal {
+                value: Some(LitType::Nil),
+            }),
+        }));
     }
 
     fn statement(&mut self) -> Result<Option<Statement>> {
@@ -131,9 +158,92 @@ impl Parser {
             Ok(Some(self.if_statement()?))
         } else if self.match_type(vec![TokenType::PRINT]) {
             self.print_statement()
+        } else if self.match_type(vec![TokenType::WHILE]) {
+            self.while_statement()
+        } else if self.match_type(vec![TokenType::FOR]) {
+            self.for_statement()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn for_statement(&mut self) -> Result<Option<Statement>> {
+        let _ = self.consume(TokenType::LeftParen, "Expected '(' after 'for'.");
+        let initializer: Option<Statement>;
+        let mut condition: Option<Expr> = None;
+        let mut increment: Option<Expr> = None;
+        if self.match_type(vec![TokenType::Semicolon]) {
+            initializer = None;
+        } else if self.match_type(vec![TokenType::VAR]) {
+            initializer = self.var_declaration()?;
+        } else {
+            initializer = self.expression_statement()?;
+        }
+        if self.check(TokenType::Semicolon) {
+            condition = self.expression()?;
+        }
+
+        let _ = self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
+
+        if self.check(TokenType::RightParen) {
+            increment = self.expression()?;
+        }
+        let _ = self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+        let body = self.statement()?;
+        if let Some(inc) = increment {
+            if let Some(bdy) = body {
+                return Ok(Some(Statement::Block {
+                    statements: vec![
+                        Box::new(bdy),
+                        Box::new(Statement::Expression { expression: inc }),
+                    ],
+                }));
+            }
+        }
+
+        if let Some(con) = condition {
+            if let Some(bdy) = body {
+                return Ok(Some(Statement::While {
+                    condition: con,
+                    body: Box::new(bdy),
+                }));
+            }
+        } else {
+            if let Some(bdy) = body {
+                return Ok(Some(Statement::While {
+                    condition: Expr::Literal {
+                        value: Some(LitType::Bool(true)),
+                    },
+                    body: Box::new(bdy),
+                }));
+            }
+        }
+
+        if let Some(init) = initializer {
+            if let Some(bdy) = body {
+                return Ok(Some(Statement::Block {
+                    statements: vec![Box::new(init), Box::new(bdy)],
+                }));
+            }
+        }
+        return Ok(body);
+    }
+
+    fn while_statement(&mut self) -> Result<Option<Statement>> {
+        let _ = self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
+        if let Some(condition) = self.expression()? {
+            let _ = self.consume(TokenType::RightParen, "Expected ')' after condition.");
+            if let Some(body) = self.statement()? {
+                return Ok(Some(Statement::While {
+                    condition,
+                    body: Box::new(body),
+                }));
+            }
+            return Err(Report::new(ParserError::WhileMissingBody(condition)));
+        }
+        return Err(Report::new(ParserError::WhileMissingCondition(
+            self.previous(),
+        )));
     }
 
     fn if_statement(&mut self) -> Result<Statement> {
@@ -185,7 +295,6 @@ impl Parser {
 
     fn expression_statement(&mut self) -> Result<Option<Statement>> {
         if let Some(expr) = self.expression()? {
-            let _ = self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
             return Ok(Some(Statement::Expression { expression: expr }));
         }
         Err(Report::new(ParserError::ExpressionNoExpression))
@@ -223,6 +332,10 @@ impl Parser {
                 let equals = self.previous();
                 if let Some(value) = self.assignment()? {
                     if let Expr::Variable { name } = expr {
+                        let _ = self.consume(
+                            TokenType::Semicolon,
+                            "Expect ';' after variable assignment.",
+                        )?;
                         return Ok(Some(Expr::Assign {
                             name,
                             value: Box::new(value),

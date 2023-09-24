@@ -5,6 +5,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
+    #[error("[Error] [Parser] While missing condition: {0}")]
+    WhileMissingCondition(Token),
+    #[error("[Error] [Parser] While missing body: {0}")]
+    WhileMissingBody(Expr),
     #[error("[Error] [Parser] Logic 'and' missing right hand expression: {0}")]
     LogicAndMissingRight(Expr),
     #[error("[Error] [Parser] Logic 'or' missing right hand expression: {0}")]
@@ -65,8 +69,8 @@ pub enum RuntimeError {
     InvalidUnary(Expr),
     #[error("[Error] [Runtime] [DivideByZero] {0}")]
     DivideByZero(Expr),
-    #[error("[Error] [Runtime] [InvalidNumerical] {0}")]
-    InvalidNumerical(Expr),
+    #[error("[Error] [Runtime] [InvalidNumerical] Got expression {0} with token {1}")]
+    InvalidNumerical(Expr, Token),
     #[error("[Error] [Runtime] [InvalidStringConcat] {0}")]
     InvalidStringConcat(Expr),
     #[error("[Error] [Runtime] [BinaryTypeMismatch] {0}")]
