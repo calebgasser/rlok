@@ -12,10 +12,77 @@ if bark
 else
 	print cat;
 
-var bark = false;
+bark = false;
 print "bark = false";
 print "If 'bark' then 'cat' else 'dog'";
 if bark
 	print dog;
 else
 	print cat;
+
+print "";
+print "Nested if statements";
+print "";
+
+var morning = true;
+bark = true;
+print "bark = true";
+print "morning = true";
+print "If 'morning' if 'bark' then 'NO BARKING!' else 'No MEOWING!' else if 'bark' then 'WOOF!' else 'Meow!'";
+
+if morning
+	if bark
+		print "NO BARKING!";
+	else
+		print "NO MEOWING!";
+else
+	if bark
+		print "WOOF!";
+	else
+		print "Meow!";
+
+bark = false;
+print "bark = false";
+
+if morning
+	if bark
+		print "NO BARKING!";
+	else
+		print "NO MEOWING!";
+else
+	if bark
+		print "WOOF!";
+	else
+		print "Meow!";
+
+morning = false;
+bark = true;
+print "bark = true";
+print "morning = false";
+
+
+if morning
+	if bark
+		print "NO BARKING!";
+	else
+		print "NO MEOWING!";
+else
+	if bark
+		print "WOOF!";
+	else
+		print "Meow!";
+
+bark = false;
+print "bark = false";
+
+
+if morning
+	if bark
+		print "NO BARKING!";
+	else
+		print "NO MEOWING!";
+else
+	if bark
+		print "WOOF!";
+	else
+		print "Meow!";

@@ -13,12 +13,14 @@ use std::io::Write;
 
 pub struct Interpreter {
     environment: Environment,
+    is_repl: bool,
 }
 
 impl Interpreter {
     pub fn build() -> Self {
         Interpreter {
             environment: Environment::new(None),
+            is_repl: false,
         }
     }
 
@@ -26,6 +28,7 @@ impl Interpreter {
         if args.len() == 2 {
             self.run_file(&args[1])?;
         } else {
+            self.is_repl = true;
             self.run_prompt()?;
         }
         Ok(())
@@ -41,8 +44,10 @@ impl Interpreter {
                     for stmt in &ast {
                         match self.evaluate_statement(stmt.clone()) {
                             Ok(output) => {
-                                if let Some(out) = output {
-                                    Self::print_lit(out);
+                                if self.is_repl {
+                                    if let Some(out) = output {
+                                        Self::print_lit(out);
+                                    }
                                 }
                             }
                             Err(e) => {
