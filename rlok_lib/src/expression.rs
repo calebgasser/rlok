@@ -25,6 +25,11 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    Logcial {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>,
+    },
 }
 
 impl std::fmt::Display for Expr {
@@ -46,6 +51,11 @@ impl std::fmt::Display for Expr {
             Expr::Unary { operator, right } => write!(f, "( {} {} )", operator, right),
             Expr::Variable { name } => write!(f, "{:?}", name),
             Expr::Assign { name, value } => write!(f, "( {} = {})", name, value),
+            Expr::Logcial {
+                left,
+                operator,
+                right,
+            } => write!(f, "( {} {} {})", left, operator, right),
         }
     }
 }

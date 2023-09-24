@@ -218,7 +218,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> Result<Option<Expr>> {
-        if let Some(expr) = self.equality()? {
+        if let Some(expr) = self.logic_or()? {
             if self.match_type(vec![TokenType::Equal]) {
                 let equals = self.previous();
                 if let Some(value) = self.assignment()? {
@@ -231,6 +231,42 @@ impl Parser {
                     return Err(Report::new(ParserError::UnexpectedAssignmentTarget(equals)));
                 }
                 return Err(Report::new(ParserError::InvalidAssignmentTarget(equals)));
+            }
+            return Ok(Some(expr));
+        }
+        Ok(None)
+    }
+
+    fn logic_or(&mut self) -> Result<Option<Expr>> {
+        if let Some(expr) = self.logic_and()? {
+            while self.match_type(vec![TokenType::OR]) {
+                let operator = self.previous();
+                if let Some(right) = self.logic_and()? {
+                    return Ok(Some(Expr::Logcial {
+                        left: Box::new(expr),
+                        operator,
+                        right: Box::new(right),
+                    }));
+                }
+                return Err(Report::new(ParserError::LogicOrMissingRight(expr)));
+            }
+            return Ok(Some(expr));
+        }
+        Ok(None)
+    }
+
+    fn logic_and(&mut self) -> Result<Option<Expr>> {
+        if let Some(expr) = self.equality()? {
+            while self.match_type(vec![TokenType::AND]) {
+                let operator = self.previous();
+                if let Some(right) = self.equality()? {
+                    return Ok(Some(Expr::Logcial {
+                        left: Box::new(expr),
+                        operator,
+                        right: Box::new(right),
+                    }));
+                }
+                return Err(Report::new(ParserError::LogicAndMissingRight(expr)));
             }
             return Ok(Some(expr));
         }

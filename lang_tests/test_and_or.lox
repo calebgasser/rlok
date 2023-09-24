@@ -1,0 +1,55 @@
+print "if true and true print 'hello' else print 'bye' - Expect 'hello'";
+
+if true and true
+	print "hello";
+else
+	print "bye";
+
+print "if true and false print 'hello' else print 'bye' - Expect 'bye'";
+
+if true and false
+	print "hello";
+else
+	print "bye";
+
+print "if false and true print 'hello' else print 'bye' - Expect 'bye'";
+
+if false and true
+	print "hello";
+else
+	print "bye";
+
+print "if false and false print 'hello' else print 'bye' - Expect 'bye'";
+
+if false and false
+	print "hello";
+else
+	print "bye";
+
+print "if true or true print 'hello' else print 'bye' - Expect 'hello'";
+
+if true or true
+	print "hello";
+else
+	print "bye";
+
+print "if true or false print 'hello' else print 'bye' - Expect 'hello'";
+
+if true or false
+	print "hello";
+else
+	print "bye";
+
+print "if false or true print 'hello' else print 'bye' - Expect 'hello'";
+
+if false or true
+	print "hello";
+else
+	print "bye";
+
+print "if false or false print 'hello' else print 'bye' - Expect 'bye'";
+
+if false or false
+	print "hello";
+else
+	print "bye";

@@ -179,6 +179,20 @@ impl Interpreter {
         }
     }
 
+    fn logical_expr(&mut self, left: Expr, operator: TokenType, right: Expr) -> Result<LitType> {
+        let left = self.evaluate_expr(left)?;
+        if matches!(operator, TokenType::OR) {
+            if Self::is_truthy(left.clone()) {
+                return Ok(left);
+            };
+        } else {
+            if !Self::is_truthy(left.clone()) {
+                return Ok(left);
+            };
+        }
+        return self.evaluate_expr(right);
+    }
+
     fn print_lit(lit: LitType) {
         match lit {
             LitType::Float(flt) => println!("{}", flt),
@@ -315,6 +329,11 @@ impl Interpreter {
                     name.clone(),
                 )))
             }
+            Expr::Logcial {
+                left,
+                operator,
+                right,
+            } => Ok(self.logical_expr(*left.clone(), operator.ty.clone(), *right.clone())?),
         }
     }
 }

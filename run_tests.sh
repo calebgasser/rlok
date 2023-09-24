@@ -10,3 +10,5 @@ printf "\n=== Scopes Test ===\n"
 ./target/release/rlok ./lang_tests/test_scopes.lox
 printf "\n=== If/else statement Test ===\n"
 ./target/release/rlok ./lang_tests/test_if_statements.lox
+printf "\n=== and/or Test ===\n"
+./target/release/rlok ./lang_tests/test_and_or.lox

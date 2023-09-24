@@ -5,6 +5,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
+    #[error("[Error] [Parser] Logic 'and' missing right hand expression: {0}")]
+    LogicAndMissingRight(Expr),
+    #[error("[Error] [Parser] Logic 'or' missing right hand expression: {0}")]
+    LogicOrMissingRight(Expr),
     #[error("[Error] [Parser] Missing if condition: {0}")]
     MissingIfCondition(Token),
     #[error("[Error] [Parser] Missing then branch: {0}")]
