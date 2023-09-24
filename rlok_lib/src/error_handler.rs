@@ -5,6 +5,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
+    #[error("[Error] [Parser] Missing if condition: {0}")]
+    MissingIfCondition(Token),
+    #[error("[Error] [Parser] Missing then branch: {0}")]
+    MissingThenBranch(Expr),
     #[error("[Error] [Parser] Unexpected assignment target: {0}")]
     UnexpectedAssignmentTarget(Token),
     #[error("[Error] [Parser] Invalid assignment target: {0}")]

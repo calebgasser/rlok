@@ -183,6 +183,43 @@ impl Interpreter {
         }
     }
 
+    fn is_truthy(lit: LitType) -> bool {
+        match lit {
+            LitType::Float(flt) => {
+                if flt > 0.0 {
+                    true
+                } else {
+                    false
+                }
+            }
+            LitType::Str(str) => {
+                if str.len() > 0 {
+                    true
+                } else {
+                    false
+                }
+            }
+            LitType::Bool(bl) => bl,
+            LitType::Nil => false,
+        }
+    }
+
+    fn if_statement(
+        &mut self,
+        condition: Expr,
+        then_condition: Statement,
+        else_condition: Option<Statement>,
+    ) -> Result<()> {
+        if Self::is_truthy(self.evaluate_expr(condition)?) {
+            self.evaluate_statement(then_condition)?;
+        } else {
+            if let Some(els) = else_condition {
+                self.evaluate_statement(els)?;
+            }
+        }
+        Ok(())
+    }
+
     fn var_statement(&mut self, stmt: Statement) -> Result<()> {
         if let Statement::Var { name, expression } = stmt.clone() {
             if let Some(expr) = expression {
@@ -195,7 +232,7 @@ impl Interpreter {
         Err(Report::new(RuntimeError::UnexpectedStatement(stmt)))
     }
 
-    fn execute_block(
+    fn block_statement(
         &mut self,
         statements: Vec<Box<Statement>>,
         environment: Environment,
@@ -227,10 +264,22 @@ impl Interpreter {
                 return Ok(None);
             }
             Statement::Block { statements } => {
-                self.execute_block(
+                self.block_statement(
                     statements,
                     Environment::new(Some(Box::new(self.environment.clone()))),
                 )?;
+                Ok(None)
+            }
+            Statement::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if let Some(els) = else_branch {
+                    self.if_statement(condition, *then_branch, Some(*els))?;
+                } else {
+                    self.if_statement(condition, *then_branch, None)?;
+                }
                 Ok(None)
             }
         }

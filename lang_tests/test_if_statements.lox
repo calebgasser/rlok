@@ -1,0 +1,21 @@
+var cat = "Kitty";
+var dog = "Asher";
+var bark = true;
+
+print "cat = " + cat;
+print "dog = " + dog;
+print "bark = true";
+
+print "If 'bark' then 'cat' else 'dog'";
+if bark
+	print dog;
+else
+	print cat;
+
+var bark = false;
+print "bark = false";
+print "If 'bark' then 'cat' else 'dog'";
+if bark
+	print dog;
+else
+	print cat;

@@ -123,15 +123,45 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Option<Statement>> {
-        if self.match_type(vec![TokenType::PRINT]) {
-            self.print_statement()
-        } else if self.match_type(vec![TokenType::LeftBrace]) {
+        if self.match_type(vec![TokenType::LeftBrace]) {
             return Ok(Some(Statement::Block {
                 statements: self.block_statement()?,
             }));
+        } else if self.match_type(vec![TokenType::IF]) {
+            Ok(Some(self.if_statement()?))
+        } else if self.match_type(vec![TokenType::PRINT]) {
+            self.print_statement()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn if_statement(&mut self) -> Result<Statement> {
+        let _ = self.consume(TokenType::LeftParen, "Expected '(' after 'if'.");
+        if let Some(condition) = self.expression()? {
+            let _ = self.consume(TokenType::RightParen, "Expected ')' after if condition.");
+            if let Some(then_branch) = self.statement()? {
+                if self.match_type(vec![TokenType::ELSE]) {
+                    if let Some(els) = self.statement()? {
+                        return Ok(Statement::If {
+                            condition,
+                            then_branch: Box::new(then_branch),
+                            else_branch: Some(Box::new(els)),
+                        });
+                    }
+                } else {
+                    return Ok(Statement::If {
+                        condition,
+                        then_branch: Box::new(then_branch),
+                        else_branch: None,
+                    });
+                }
+            }
+            return Err(Report::new(ParserError::MissingThenBranch(condition)));
+        }
+        return Err(Report::new(ParserError::MissingIfCondition(
+            self.previous(),
+        )));
     }
 
     fn block_statement(&mut self) -> Result<Vec<Box<Statement>>> {

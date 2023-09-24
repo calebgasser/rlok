@@ -8,3 +8,5 @@ printf "\n=== Variables Test ===\n"
 ./target/release/rlok ./lang_tests/test_variables.lox
 printf "\n=== Scopes Test ===\n"
 ./target/release/rlok ./lang_tests/test_scopes.lox
+printf "\n=== If/else statement Test ===\n"
+./target/release/rlok ./lang_tests/test_if_statements.lox
