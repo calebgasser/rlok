@@ -49,7 +49,7 @@ impl std::fmt::Display for Expr {
                 }
             }
             Expr::Unary { operator, right } => write!(f, "Unary( {} {} )", operator, right),
-            Expr::Variable { name } => write!(f, "{:?}", name),
+            Expr::Variable { name } => write!(f, "Var( {:?} )", name),
             Expr::Assign { name, value } => write!(f, "Assign( {} = {})", name, value),
             Expr::Logcial {
                 left,

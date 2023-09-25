@@ -5,7 +5,7 @@ use super::lit::LitType;
 use super::parser::Parser;
 use super::scanner::Scanner;
 use super::statement::Statement;
-use super::tokens::TokenType;
+use super::tokens::{Token, TokenType};
 use color_eyre::eyre::{Report, Result};
 use std::fs;
 use std::io;
@@ -37,7 +37,7 @@ impl Interpreter {
     fn run(&mut self, contents: String) -> Result<()> {
         let mut scanner = Scanner::build(contents);
         let tokens = scanner.scan_tokens()?;
-        let mut parser = Parser::new(tokens.clone(), true)?;
+        let mut parser = Parser::new(tokens.clone(), false)?;
         match parser.parse() {
             Ok(ast) => {
                 if let Some(ast) = ast {
@@ -270,12 +270,10 @@ impl Interpreter {
         statements: Vec<Box<Statement>>,
         environment: Environment,
     ) -> Result<()> {
-        let previous = self.environment.clone();
         self.environment = environment;
         for stmt in statements {
             self.evaluate_statement(*stmt)?;
         }
-        self.environment = previous;
         Ok(())
     }
 
@@ -322,6 +320,22 @@ impl Interpreter {
         }
     }
 
+    fn assign_expr(&mut self, name: Token, value: Expr) -> Result<LitType> {
+        if let Expr::Literal { ref value } = value {
+            if let Some(val) = value {
+                self.environment.assign(name.clone(), val.clone())?;
+                return Ok(val.clone());
+            }
+        } else {
+            let val = self.evaluate_expr(value.clone())?;
+            self.environment.assign(name.clone(), val.clone())?;
+            return Ok(val.clone());
+        }
+        Err(Report::new(RuntimeError::InvalidAssignmentTarget(
+            name, value,
+        )))
+    }
+
     fn evaluate_expr(&mut self, expr: Expr) -> Result<LitType> {
         match &expr {
             Expr::Binary {
@@ -336,29 +350,7 @@ impl Interpreter {
             } => Ok(self.unary_expr(expr)?),
             Expr::Literal { value: _ } => Ok(self.literal_expr(expr)?),
             Expr::Variable { name: _ } => Ok(self.var_expr(expr)?),
-            Expr::Assign { name, value } => {
-                if let Expr::Literal { ref value } = **value {
-                    if let Some(val) = value {
-                        self.environment.assign(name.clone(), val.clone())?;
-                        return Ok(val.clone());
-                    }
-                } else {
-                    let val = self.evaluate_expr(*value.clone())?;
-                    self.environment.assign(name.clone(), val.clone())?;
-                    return Ok(val.clone());
-                }
-                let origin_name = name;
-                if let Expr::Variable { ref name } = **value {
-                    if let Some(val) = self.environment.get(name.clone())? {
-                        self.environment.assign(origin_name.clone(), val.clone())?;
-                        return Ok(val);
-                    }
-                }
-                Err(Report::new(RuntimeError::InvalidAssignmentTarget(
-                    name.clone(),
-                    *value.clone(),
-                )))
-            }
+            Expr::Assign { name, value } => Ok(self.assign_expr(name.clone(), *value.clone())?),
             Expr::Logcial {
                 left,
                 operator,
