@@ -39,8 +39,8 @@ impl std::fmt::Display for Expr {
                 left,
                 operator,
                 right,
-            } => write!(f, "( {} {} {} )", left, operator, right),
-            Expr::Grouping { expression } => write!(f, "( {} )", expression),
+            } => write!(f, "Binary( {} {} {} )", left, operator, right),
+            Expr::Grouping { expression } => write!(f, "Group( {} )", expression),
             Expr::Literal { value } => {
                 if let Some(val) = value {
                     write!(f, "{}", val)
@@ -48,14 +48,14 @@ impl std::fmt::Display for Expr {
                     write!(f, "VALUE_MISSING")
                 }
             }
-            Expr::Unary { operator, right } => write!(f, "( {} {} )", operator, right),
+            Expr::Unary { operator, right } => write!(f, "Unary( {} {} )", operator, right),
             Expr::Variable { name } => write!(f, "{:?}", name),
-            Expr::Assign { name, value } => write!(f, "( {} = {})", name, value),
+            Expr::Assign { name, value } => write!(f, "Assign( {} = {})", name, value),
             Expr::Logcial {
                 left,
                 operator,
                 right,
-            } => write!(f, "( {} {} {})", left, operator, right),
+            } => write!(f, "Logical( {} {} {})", left, operator, right),
         }
     }
 }

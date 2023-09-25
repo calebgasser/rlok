@@ -85,6 +85,6 @@ pub enum RuntimeError {
     StatementMissingExpression(Statement),
     #[error("[Error] [Runtime] Statement not expected here: {0}")]
     UnexpectedStatement(Statement),
-    #[error("[Error] [Runtime] Invalid assignment target: {0}")]
-    InvalidAssignmentTarget(Token),
+    #[error("[Error] [Runtime] Invalid assignment target: {0} with {1}")]
+    InvalidAssignmentTarget(Token, Expr),
 }

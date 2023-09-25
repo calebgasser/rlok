@@ -150,6 +150,11 @@ impl Interpreter {
                             }
                         }
                         TokenType::Star => return Ok(LitType::Float(l * r)),
+                        TokenType::Less => return Ok(LitType::Bool(l < r)),
+                        TokenType::LessEqual => return Ok(LitType::Bool(l <= r)),
+                        TokenType::Greater => return Ok(LitType::Bool(l > r)),
+                        TokenType::GreaterEqual => return Ok(LitType::Bool(l >= r)),
+                        TokenType::EqualEqual => return Ok(LitType::Bool(l == r)),
                         _ => {
                             return Err(Report::new(RuntimeError::InvalidNumerical(expr, operator)))
                         }
@@ -172,11 +177,9 @@ impl Interpreter {
     fn var_expr(&self, expr: Expr) -> Result<LitType> {
         match expr {
             Expr::Variable { name } => {
-                println!("Environment: {:#?}", self.environment);
                 if let Some(val) = self.environment.get(name.clone())? {
                     return Ok(val);
                 }
-                println!("Environment: {:#?}", self.environment);
                 return Err(Report::new(RuntimeError::UndefinedVariable(name.lexeme)));
             }
             _ => Err(Report::new(RuntimeError::ExpressionNotVariable(expr))),
@@ -339,6 +342,10 @@ impl Interpreter {
                         self.environment.assign(name.clone(), val.clone())?;
                         return Ok(val.clone());
                     }
+                } else {
+                    let val = self.evaluate_expr(*value.clone())?;
+                    self.environment.assign(name.clone(), val.clone())?;
+                    return Ok(val.clone());
                 }
                 let origin_name = name;
                 if let Expr::Variable { ref name } = **value {
@@ -349,6 +356,7 @@ impl Interpreter {
                 }
                 Err(Report::new(RuntimeError::InvalidAssignmentTarget(
                     name.clone(),
+                    *value.clone(),
                 )))
             }
             Expr::Logcial {
