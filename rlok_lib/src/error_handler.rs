@@ -21,10 +21,10 @@ pub enum ParserError {
     UnexpectedAssignmentTarget(Token),
     #[error("[Error] [Parser] Invalid assignment target: {0}")]
     InvalidAssignmentTarget(Token),
-    #[error("[Error] [Parser] PrintExpression missing expression.")]
-    ExpressionNoExpression,
-    #[error("[Error] [Parser] Print missing expression.")]
-    PrintNoExpression,
+    #[error("[Error] [Parser] Expression missing expression: {0}")]
+    ExpressionNoExpression(Token),
+    #[error("[Error] [Parser] Print missing expression: {0}")]
+    PrintNoExpression(Token),
     #[error("[Error] [Parser] Variable declaration error")]
     VarDeclartionError,
     #[error("[Error] [Parser] Variable expression missing on token: {0}")]

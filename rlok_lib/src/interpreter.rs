@@ -172,9 +172,11 @@ impl Interpreter {
     fn var_expr(&self, expr: Expr) -> Result<LitType> {
         match expr {
             Expr::Variable { name } => {
+                println!("Environment: {:#?}", self.environment);
                 if let Some(val) = self.environment.get(name.clone())? {
                     return Ok(val);
                 }
+                println!("Environment: {:#?}", self.environment);
                 return Err(Report::new(RuntimeError::UndefinedVariable(name.lexeme)));
             }
             _ => Err(Report::new(RuntimeError::ExpressionNotVariable(expr))),
@@ -336,6 +338,13 @@ impl Interpreter {
                     if let Some(val) = value {
                         self.environment.assign(name.clone(), val.clone())?;
                         return Ok(val.clone());
+                    }
+                }
+                let origin_name = name;
+                if let Expr::Variable { ref name } = **value {
+                    if let Some(val) = self.environment.get(name.clone())? {
+                        self.environment.assign(origin_name.clone(), val.clone())?;
+                        return Ok(val);
                     }
                 }
                 Err(Report::new(RuntimeError::InvalidAssignmentTarget(

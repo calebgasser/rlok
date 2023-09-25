@@ -179,24 +179,25 @@ impl Parser {
         } else {
             initializer = self.expression_statement()?;
         }
-        if self.check(TokenType::Semicolon) {
+
+        if !self.check(TokenType::Semicolon) {
             condition = self.expression()?;
         }
 
         let _ = self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
-        if self.check(TokenType::RightParen) {
+        if !self.check(TokenType::RightParen) {
             increment = self.expression()?;
         }
-        let _ = self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+
+        let _ = self.consume(TokenType::RightParen, "Expect ')' after for clause.");
+
         let body = self.statement()?;
-        if let Some(inc) = increment {
+
+        if let Some(init) = initializer {
             if let Some(bdy) = body {
                 return Ok(Some(Statement::Block {
-                    statements: vec![
-                        Box::new(bdy),
-                        Box::new(Statement::Expression { expression: inc }),
-                    ],
+                    statements: vec![Box::new(init), Box::new(bdy)],
                 }));
             }
         }
@@ -219,13 +220,17 @@ impl Parser {
             }
         }
 
-        if let Some(init) = initializer {
+        if let Some(inc) = increment {
             if let Some(bdy) = body {
                 return Ok(Some(Statement::Block {
-                    statements: vec![Box::new(init), Box::new(bdy)],
+                    statements: vec![
+                        Box::new(bdy),
+                        Box::new(Statement::Expression { expression: inc }),
+                    ],
                 }));
             }
         }
+
         return Ok(body);
     }
 
@@ -290,14 +295,14 @@ impl Parser {
             let _ = self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
             return Ok(Some(Statement::Print { expression: expr }));
         }
-        Err(Report::new(ParserError::PrintNoExpression))
+        Err(Report::new(ParserError::PrintNoExpression(self.previous())))
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>> {
         if let Some(expr) = self.expression()? {
             return Ok(Some(Statement::Expression { expression: expr }));
         }
-        Err(Report::new(ParserError::ExpressionNoExpression))
+        Ok(None)
     }
 
     // expression     → comma ;
@@ -332,10 +337,12 @@ impl Parser {
                 let equals = self.previous();
                 if let Some(value) = self.assignment()? {
                     if let Expr::Variable { name } = expr {
-                        let _ = self.consume(
-                            TokenType::Semicolon,
-                            "Expect ';' after variable assignment.",
-                        )?;
+                        if matches!(self.peek().ty, TokenType::Semicolon) {
+                            let _ = self.consume(
+                                TokenType::Semicolon,
+                                "Expect ';' after variable assignment.",
+                            )?;
+                        }
                         return Ok(Some(Expr::Assign {
                             name,
                             value: Box::new(value),

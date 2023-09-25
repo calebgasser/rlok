@@ -4,7 +4,7 @@ use super::tokens::Token;
 use color_eyre::eyre::{Report, Result};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Environment {
     values: HashMap<String, LitType>,
     enclosing: Option<Box<Environment>>,
