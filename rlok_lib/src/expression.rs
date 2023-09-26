@@ -30,6 +30,11 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Box<Expr>>,
+    },
 }
 
 impl std::fmt::Display for Expr {
@@ -56,6 +61,11 @@ impl std::fmt::Display for Expr {
                 operator,
                 right,
             } => write!(f, "Logical( {} {} {})", left, operator, right),
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => write!(f, "Call( {} {} {:?})", callee, paren, arguments),
         }
     }
 }

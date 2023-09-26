@@ -25,6 +25,11 @@ pub enum Statement {
         condition: Expr,
         body: Box<Statement>,
     },
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Box<Statement>>,
+    },
 }
 
 impl std::fmt::Display for Statement {
@@ -51,6 +56,13 @@ impl std::fmt::Display for Statement {
             }
             Statement::While { condition, body } => {
                 write!(f, "{{ while {} do {} }}", condition, body)
+            }
+            Statement::Function { name, params, body } => {
+                write!(
+                    f,
+                    "{{ function {} params {:?} body {:?} }}",
+                    name, params, body
+                )
             }
         }
     }

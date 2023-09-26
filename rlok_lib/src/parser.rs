@@ -5,28 +5,6 @@ use super::statement::Statement;
 use super::tokens::{Token, TokenType};
 use color_eyre::eyre::{Report, Result};
 
-// expression     → literal
-//                | unary
-//                | binary
-//                | grouping ;
-// literal        → NUMBER | STRING | "true" | "false" | "nil" ;
-// grouping       → "(" expression ")" ;
-// unary          → ( "-" | "!" ) expression ;
-// binary         → expression operator expression ;
-// operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
-//                | "+"  | "-"  | "*" | "/" ;
-// ---------------------------------------------------------------
-// expression     → comma ;
-// comma          → comparison ( "," comparison )*;
-// equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-// comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-// term           → factor ( ( "-" | "+" ) factor )* ;
-// factor         → unary ( ( "/" | "*" ) unary )* ;
-// unary          → ( "!" | "-" ) unary
-//                | primary ;
-// primary        → NUMBER | STRING | "true" | "false" | "nil"
-//                | "(" expression ")" ;
-
 pub struct Parser {
     tokens: Vec<Token>,
     current: i32,
@@ -117,11 +95,41 @@ impl Parser {
 
     fn declaration(&mut self) -> Result<Option<Statement>> {
         if self.match_type(vec![TokenType::VAR]) {
+            return Ok(Some(self.function_declaration("function".into())?));
+        }
+        if self.match_type(vec![TokenType::VAR]) {
             return self.var_declaration();
         }
         self.statement()
     }
 
+    fn function_declaration(&mut self, kind: String) -> Result<Statement> {
+        let name = self.consume(TokenType::Ident, &format!("Expect {} name.", kind))?;
+        let mut parameters = Vec::new();
+
+        if self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    return Err(Report::new(ParserError::MaxArguments(self.peek())));
+                }
+                parameters.push(self.consume(TokenType::Ident, "Expect parameter name.")?);
+                if !self.match_type(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        let _ = self.consume(TokenType::RightParen, "Expect ')' after parameters");
+        let _ = self.consume(
+            TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body", kind),
+        );
+        let body = self.block_statement()?;
+        Ok(Statement::Function {
+            name,
+            params: parameters,
+            body,
+        })
+    }
     fn var_declaration(&mut self) -> Result<Option<Statement>> {
         let name = self.consume(TokenType::Ident, "Expected variable name.")?;
         if self.match_type(vec![TokenType::Equal]) {
@@ -393,7 +401,6 @@ impl Parser {
         Ok(None)
     }
 
-    // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
     fn equality(&mut self) -> Result<Option<Expr>> {
         if let Some(expr) = self.comparison()? {
             while self.match_type(vec![TokenType::BangEqual, TokenType::EqualEqual]) {
@@ -411,7 +418,6 @@ impl Parser {
         Ok(None)
     }
 
-    // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
     fn comparison(&mut self) -> Result<Option<Expr>> {
         if let Some(mut expr) = self.term()? {
             while self.match_type(vec![
@@ -433,7 +439,7 @@ impl Parser {
         }
         Ok(None)
     }
-    // term           → factor ( ( "-" | "+" ) factor )* ;
+
     fn term(&mut self) -> Result<Option<Expr>> {
         if let Some(mut expr) = self.factor()? {
             while self.match_type(vec![TokenType::Minus, TokenType::Plus]) {
@@ -450,7 +456,7 @@ impl Parser {
         }
         Ok(None)
     }
-    // factor         → unary ( ( "/" | "*" ) unary )* ;
+
     fn factor(&mut self) -> Result<Option<Expr>> {
         if let Some(mut expr) = self.unary()? {
             while self.match_type(vec![TokenType::Slash, TokenType::Star]) {
@@ -468,10 +474,9 @@ impl Parser {
         }
         Ok(None)
     }
-    // unary          → ( "!" | "-" ) unary
-    //                | primary ;
+
     fn unary(&mut self) -> Result<Option<Expr>> {
-        if let Some(mut expr) = self.primary()? {
+        if let Some(mut expr) = self.call()? {
             if self.match_type(vec![TokenType::Bang, TokenType::Minus]) {
                 let operator = self.previous();
                 if let Some(right) = self.unary()? {
@@ -485,8 +490,44 @@ impl Parser {
         }
         Ok(None)
     }
-    // primary        → NUMBER | STRING | "true" | "false" | "nil"
-    //                | "(" expression ")";
+
+    fn call(&mut self) -> Result<Option<Expr>> {
+        if let Some(mut expr) = self.primary()? {
+            loop {
+                if self.match_type(vec![TokenType::LeftParen]) {
+                    expr = self.finish_call(expr)?;
+                } else {
+                    break;
+                }
+            }
+            return Ok(Some(expr));
+        }
+        Ok(None)
+    }
+
+    fn finish_call(&mut self, expr: Expr) -> Result<Expr> {
+        let mut arguments = Vec::new();
+        if self.check(TokenType::RightParen) {
+            loop {
+                if let Some(ex) = self.expression()? {
+                    if arguments.len() >= 255 {
+                        return Err(Report::new(ParserError::MaxArguments(self.peek())));
+                    }
+                    arguments.push(Box::new(ex));
+                }
+                if !self.match_type(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        let paren = self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
+        return Ok(Expr::Call {
+            callee: Box::new(expr),
+            paren,
+            arguments,
+        });
+    }
+
     fn primary(&mut self) -> Result<Option<Expr>> {
         if self.match_type(vec![TokenType::FALSE]) {
             return Ok(Some(Expr::Literal {

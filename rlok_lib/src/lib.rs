@@ -3,6 +3,7 @@ mod error_handler;
 mod expression;
 pub mod interpreter;
 mod lit;
+mod lox_callable;
 mod parser;
 mod scanner;
 mod statement;

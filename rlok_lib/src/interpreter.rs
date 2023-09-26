@@ -2,6 +2,7 @@ use super::environment::Environment;
 use super::error_handler::RuntimeError;
 use super::expression::Expr;
 use super::lit::LitType;
+use super::lox_callable::{Callable, Clock, LoxCallable, LoxFunction};
 use super::parser::Parser;
 use super::scanner::Scanner;
 use super::statement::Statement;
@@ -12,6 +13,7 @@ use std::io;
 use std::io::Write;
 
 pub struct Interpreter {
+    globals: Environment,
     environment: Environment,
     is_repl: bool,
 }
@@ -19,12 +21,17 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn build() -> Self {
         Interpreter {
+            globals: Environment::new(None),
             environment: Environment::new(None),
             is_repl: false,
         }
     }
 
     pub fn start(&mut self, args: Vec<String>) -> Result<()> {
+        self.globals.define(
+            "clock".into(),
+            LitType::Callable(LoxCallable::Clock(Clock::new("clock".into()))),
+        );
         if args.len() == 2 {
             self.run_file(&args[1])?;
         } else {
@@ -205,6 +212,10 @@ impl Interpreter {
             LitType::Float(flt) => println!("{}", flt),
             LitType::Str(str) => println!("{}", str),
             LitType::Bool(bl) => println!("{}", bl),
+            LitType::Callable(call) => match call {
+                LoxCallable::Function(func) => println!("{}", func.to_string()),
+                LoxCallable::Clock(clock) => println!("{}", clock.to_string()),
+            },
             LitType::Nil => println!("nil"),
         }
     }
@@ -336,6 +347,25 @@ impl Interpreter {
         )))
     }
 
+    fn call_expr(&mut self, callee: Expr, paren: Token, arguments: Vec<Box<Expr>>) -> Result<()> {
+        let callee = self.evaluate_expr(callee)?;
+        let mut args = Vec::new();
+        for arg in arguments {
+            args.push(self.evaluate_expr(*arg)?);
+        }
+        if let LitType::Callable(call) = callee {
+            if let LoxCallable::Function(func) = call {
+                if arguments.len() != func.arity() {
+                    return Err(Report::new(RuntimeError::IncorrectArgumentCount(
+                        func.arity(),
+                        arguments.len(),
+                    )));
+                }
+            }
+        }
+        return Err(Report::new(RuntimeError::NotCallable(paren)));
+    }
+
     fn evaluate_expr(&mut self, expr: Expr) -> Result<LitType> {
         match &expr {
             Expr::Binary {
@@ -356,6 +386,11 @@ impl Interpreter {
                 operator,
                 right,
             } => Ok(self.logical_expr(*left.clone(), operator.ty.clone(), *right.clone())?),
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => Ok(self.call_expr(*callee.clone(), paren.clone(), *arguments)?),
         }
     }
 }

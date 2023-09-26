@@ -5,6 +5,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
+    #[error("[Error] [Parser] Connot have more than 255 arguments: {0}")]
+    MaxArguments(Token),
     #[error("[Error] [Parser] While missing condition: {0}")]
     WhileMissingCondition(Token),
     #[error("[Error] [Parser] While missing body: {0}")]
@@ -57,6 +59,12 @@ pub enum ScannerError {
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
+    #[error("[Error] [Runtime] [NativeFunctionError] Error calling native function")]
+    NativeFunctionError,
+    #[error("[Error] [Runtime] [IncorrectArgumentCount] Expected {0} arguments but got {1}.")]
+    IncorrectArgumentCount(usize, usize),
+    #[error("[Error] [Runtime] [NotCallable] Can only call functions and classes: {0}")]
+    NotCallable(Token),
     #[error("[Error] [Runtime] [InvalidLiteral] {0}")]
     InvalidLiteral(Expr),
     #[error("[Error] [Runtime] [InvalidGrouping] {0}")]
