@@ -12,3 +12,7 @@ printf "\n=== If/else statement Test ===\n"
 ./target/release/rlok ./lang_tests/test_if_statements.lox
 printf "\n=== and/or Test ===\n"
 ./target/release/rlok ./lang_tests/test_and_or.lox
+printf "\n=== While Loop Test ===\n"
+./target/release/rlok ./lang_tests/test_while_loop.lox
+printf "\n=== For Loop (Fibonacci) Test ===\n"
+./target/release/rlok ./lang_tests/test_for_loop_fib.lox

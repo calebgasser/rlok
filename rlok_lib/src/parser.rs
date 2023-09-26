@@ -192,42 +192,42 @@ impl Parser {
 
         let _ = self.consume(TokenType::RightParen, "Expect ')' after for clause.");
 
-        let body = self.statement()?;
+        let mut body = self.statement()?;
 
-        if let Some(init) = initializer {
+        if let Some(inc) = increment {
             if let Some(bdy) = body {
-                return Ok(Some(Statement::Block {
-                    statements: vec![Box::new(init), Box::new(bdy)],
-                }));
+                body = Some(Statement::Block {
+                    statements: vec![
+                        Box::new(bdy),
+                        Box::new(Statement::Expression { expression: inc }),
+                    ],
+                });
             }
         }
 
         if let Some(con) = condition {
             if let Some(bdy) = body {
-                return Ok(Some(Statement::While {
+                body = Some(Statement::While {
                     condition: con,
                     body: Box::new(bdy),
-                }));
+                });
             }
         } else {
             if let Some(bdy) = body {
-                return Ok(Some(Statement::While {
+                body = Some(Statement::While {
                     condition: Expr::Literal {
                         value: Some(LitType::Bool(true)),
                     },
                     body: Box::new(bdy),
-                }));
+                });
             }
         }
 
-        if let Some(inc) = increment {
+        if let Some(init) = initializer {
             if let Some(bdy) = body {
-                return Ok(Some(Statement::Block {
-                    statements: vec![
-                        Box::new(bdy),
-                        Box::new(Statement::Expression { expression: inc }),
-                    ],
-                }));
+                body = Some(Statement::Block {
+                    statements: vec![Box::new(init), Box::new(bdy)],
+                });
             }
         }
 
