@@ -14,24 +14,25 @@ use std::io::Write;
 
 pub struct Interpreter {
     pub globals: Environment,
-    environment: Environment,
+    pub environment: Environment,
     is_repl: bool,
 }
 
 impl Interpreter {
     pub fn build() -> Self {
+        let mut globals = Environment::new(None);
+        globals.define(
+            "clock".into(),
+            LitType::Callable(LoxCallable::Clock(Clock::new("clock".into(), None))),
+        );
         Interpreter {
-            globals: Environment::new(None),
-            environment: Environment::new(None),
+            globals: globals.clone(),
+            environment: globals.clone(),
             is_repl: false,
         }
     }
 
     pub fn start(&mut self, args: Vec<String>) -> Result<()> {
-        self.globals.define(
-            "clock".into(),
-            LitType::Callable(LoxCallable::Clock(Clock::new("clock".into(), None))),
-        );
         if args.len() == 2 {
             self.run_file(&args[1])?;
         } else {
@@ -182,6 +183,7 @@ impl Interpreter {
     }
 
     fn var_expr(&self, expr: Expr) -> Result<LitType> {
+        // println!("Environment: {:#?}", self.environment);
         match expr {
             Expr::Variable { name } => {
                 if let Some(val) = self.environment.get(name.clone())? {
@@ -391,14 +393,25 @@ impl Interpreter {
             args.push(self.evaluate_expr(*arg)?);
         }
         if let LitType::Callable(call) = callee.clone() {
-            if let LoxCallable::Function(func) = call {
-                if arguments.len() != func.arity() {
-                    return Err(Report::new(RuntimeError::IncorrectArgumentCount(
-                        func.arity(),
-                        arguments.len(),
-                    )));
+            match call {
+                LoxCallable::Function(func) => {
+                    if arguments.len() != func.arity() {
+                        return Err(Report::new(RuntimeError::IncorrectArgumentCount(
+                            func.arity(),
+                            arguments.len(),
+                        )));
+                    }
+                    return Ok(func.call(self, arguments)?);
                 }
-                return Ok(func.call(self, arguments)?);
+                LoxCallable::Clock(clock) => {
+                    if arguments.len() != clock.arity() {
+                        return Err(Report::new(RuntimeError::IncorrectArgumentCount(
+                            clock.arity(),
+                            arguments.len(),
+                        )));
+                    }
+                    return Ok(clock.call(self, arguments)?);
+                }
             }
         }
         Err(Report::new(RuntimeError::NotCallable(paren)))

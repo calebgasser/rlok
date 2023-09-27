@@ -322,6 +322,10 @@ impl Parser {
 
     fn expression_statement(&mut self) -> Result<Option<Statement>> {
         if let Some(expr) = self.expression()? {
+            let _ = self.consume(
+                TokenType::Semicolon,
+                "Expected ';' after expression statement.",
+            );
             return Ok(Some(Statement::Expression { expression: expr }));
         }
         Ok(None)
@@ -517,7 +521,7 @@ impl Parser {
             }
         }
         let paren = self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
-        let _ = self.consume(TokenType::Semicolon, "Expected ';' after function call.")?;
+        // let _ = self.consume(TokenType::Semicolon, "Expected ';' after function call.")?;
         return Ok(Expr::Call {
             callee: Box::new(expr),
             paren,

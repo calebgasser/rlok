@@ -67,21 +67,23 @@ impl Callable for LoxFunction {
     fn call(&self, inter: &mut Interpreter, arguments: Vec<Box<Expr>>) -> Result<LitType> {
         let mut environment = Environment::new(Some(Box::new(inter.globals.clone())));
         if let Some(declaration) = *self.declaration.clone() {
-            if let Statement::Function {
-                name: _,
-                params,
-                body,
-            } = declaration
-            {
+            if let Statement::Function { name, params, body } = declaration.clone() {
                 for (index, param) in params.iter().enumerate() {
                     environment.define(
                         param.lexeme.clone(),
                         inter.evaluate_expr(*arguments[index].clone())?,
                     );
                 }
+                println!("Environment {:#?}", environment);
                 inter.block_statement(body, environment)?;
             }
+
+            if let Statement::Return { keyword: _, value } = declaration.clone() {
+                println!("Returning: {}", value);
+                return inter.evaluate_expr(value);
+            }
         }
+        println!("Returning nill");
         Ok(LitType::Nil)
     }
     fn arity(&self) -> usize {

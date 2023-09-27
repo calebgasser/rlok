@@ -3,3 +3,7 @@ fun sayHi(first, last) {
 }
 
 sayHi("Dear", "Programmer");
+
+var time = clock();
+print "Time: ";
+print time;
