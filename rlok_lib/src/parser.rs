@@ -86,28 +86,29 @@ impl Parser {
                     return Err(e);
                 }
             }
-            if let Some(dec) = self.declaration()? {
-                statements.push(dec.clone());
-            }
         }
         Ok(Some(statements))
     }
 
     fn declaration(&mut self) -> Result<Option<Statement>> {
-        if self.match_type(vec![TokenType::VAR]) {
+        if self.match_type(vec![TokenType::FUN]) {
             return Ok(Some(self.function_declaration("function".into())?));
-        }
-        if self.match_type(vec![TokenType::VAR]) {
+        } else if self.match_type(vec![TokenType::VAR]) {
             return self.var_declaration();
+        } else {
+            self.statement()
         }
-        self.statement()
     }
 
     fn function_declaration(&mut self, kind: String) -> Result<Statement> {
         let name = self.consume(TokenType::Ident, &format!("Expect {} name.", kind))?;
+        let _ = self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '(' after {} name.)", kind),
+        )?;
         let mut parameters = Vec::new();
 
-        if self.check(TokenType::RightParen) {
+        if !self.check(TokenType::RightParen) {
             loop {
                 if parameters.len() >= 255 {
                     return Err(Report::new(ParserError::MaxArguments(self.peek())));
@@ -166,6 +167,8 @@ impl Parser {
             Ok(Some(self.if_statement()?))
         } else if self.match_type(vec![TokenType::PRINT]) {
             self.print_statement()
+        } else if self.match_type(vec![TokenType::RETURN]) {
+            self.return_statement()
         } else if self.match_type(vec![TokenType::WHILE]) {
             self.while_statement()
         } else if self.match_type(vec![TokenType::FOR]) {
@@ -173,6 +176,17 @@ impl Parser {
         } else {
             self.expression_statement()
         }
+    }
+
+    fn return_statement(&mut self) -> Result<Option<Statement>> {
+        let keyword = self.previous();
+        if !self.match_type(vec![TokenType::Semicolon]) {
+            if let Some(value) = self.expression()? {
+                let _ = self.consume(TokenType::Semicolon, "Expect ';' after return value");
+                return Ok(Some(Statement::Return { keyword, value }));
+            }
+        }
+        Ok(None)
     }
 
     fn for_statement(&mut self) -> Result<Option<Statement>> {
@@ -315,25 +329,7 @@ impl Parser {
 
     // expression     → comma ;
     fn expression(&mut self) -> Result<Option<Expr>> {
-        if let Some(expr) = self.comma()? {
-            return Ok(Some(expr));
-        }
-        Ok(None)
-    }
-
-    // comma          → equality ( "," equality )*;
-    fn comma(&mut self) -> Result<Option<Expr>> {
-        if let Some(mut expr) = self.assignment()? {
-            while self.match_type(vec![TokenType::Comma]) {
-                let operator = self.previous();
-                if let Some(right) = self.assignment()? {
-                    expr = Expr::Binary {
-                        left: Box::new(expr),
-                        operator,
-                        right: Box::new(right),
-                    }
-                }
-            }
+        if let Some(expr) = self.assignment()? {
             return Ok(Some(expr));
         }
         Ok(None)
@@ -507,7 +503,7 @@ impl Parser {
 
     fn finish_call(&mut self, expr: Expr) -> Result<Expr> {
         let mut arguments = Vec::new();
-        if self.check(TokenType::RightParen) {
+        if !self.check(TokenType::RightParen) {
             loop {
                 if let Some(ex) = self.expression()? {
                     if arguments.len() >= 255 {
@@ -521,6 +517,7 @@ impl Parser {
             }
         }
         let paren = self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
+        let _ = self.consume(TokenType::Semicolon, "Expected ';' after function call.")?;
         return Ok(Expr::Call {
             callee: Box::new(expr),
             paren,

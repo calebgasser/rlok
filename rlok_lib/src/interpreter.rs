@@ -13,7 +13,7 @@ use std::io;
 use std::io::Write;
 
 pub struct Interpreter {
-    globals: Environment,
+    pub globals: Environment,
     environment: Environment,
     is_repl: bool,
 }
@@ -30,7 +30,7 @@ impl Interpreter {
     pub fn start(&mut self, args: Vec<String>) -> Result<()> {
         self.globals.define(
             "clock".into(),
-            LitType::Callable(LoxCallable::Clock(Clock::new("clock".into()))),
+            LitType::Callable(LoxCallable::Clock(Clock::new("clock".into(), None))),
         );
         if args.len() == 2 {
             self.run_file(&args[1])?;
@@ -238,6 +238,7 @@ impl Interpreter {
             }
             LitType::Bool(bl) => bl,
             LitType::Nil => false,
+            _ => false,
         }
     }
 
@@ -276,7 +277,7 @@ impl Interpreter {
         Err(Report::new(RuntimeError::UnexpectedStatement(stmt)))
     }
 
-    fn block_statement(
+    pub fn block_statement(
         &mut self,
         statements: Vec<Box<Statement>>,
         environment: Environment,
@@ -286,6 +287,29 @@ impl Interpreter {
             self.evaluate_statement(*stmt)?;
         }
         Ok(())
+    }
+
+    fn function_statement(
+        &mut self,
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Box<Statement>>,
+    ) -> Result<()> {
+        let stmt = Statement::Function {
+            name: name.clone(),
+            params,
+            body,
+        };
+        let function = LitType::Callable(LoxCallable::Function(LoxFunction::new(
+            name.lexeme.clone(),
+            Some(stmt.clone()),
+        )));
+        self.environment.define(name.lexeme, function);
+        Ok(())
+    }
+
+    fn return_statement(&mut self, keyword: Token, value: Expr) -> Result<LitType> {
+        self.evaluate_expr(value)
     }
 
     fn evaluate_statement(&mut self, stmt: Statement) -> Result<Option<LitType>> {
@@ -328,6 +352,14 @@ impl Interpreter {
                 self.while_statement(condition, *body)?;
                 Ok(None)
             }
+            Statement::Function { name, params, body } => {
+                self.function_statement(name, params, body)?;
+                Ok(None)
+            }
+            Statement::Return { keyword, value } => {
+                self.return_statement(keyword, value)?;
+                Ok(None)
+            }
         }
     }
 
@@ -347,13 +379,18 @@ impl Interpreter {
         )))
     }
 
-    fn call_expr(&mut self, callee: Expr, paren: Token, arguments: Vec<Box<Expr>>) -> Result<()> {
+    fn call_expr(
+        &mut self,
+        callee: Expr,
+        paren: Token,
+        arguments: Vec<Box<Expr>>,
+    ) -> Result<LitType> {
         let callee = self.evaluate_expr(callee)?;
         let mut args = Vec::new();
-        for arg in arguments {
+        for arg in arguments.clone() {
             args.push(self.evaluate_expr(*arg)?);
         }
-        if let LitType::Callable(call) = callee {
+        if let LitType::Callable(call) = callee.clone() {
             if let LoxCallable::Function(func) = call {
                 if arguments.len() != func.arity() {
                     return Err(Report::new(RuntimeError::IncorrectArgumentCount(
@@ -361,12 +398,13 @@ impl Interpreter {
                         arguments.len(),
                     )));
                 }
+                return Ok(func.call(self, arguments)?);
             }
         }
-        return Err(Report::new(RuntimeError::NotCallable(paren)));
+        Err(Report::new(RuntimeError::NotCallable(paren)))
     }
 
-    fn evaluate_expr(&mut self, expr: Expr) -> Result<LitType> {
+    pub fn evaluate_expr(&mut self, expr: Expr) -> Result<LitType> {
         match &expr {
             Expr::Binary {
                 left: _,
@@ -390,7 +428,7 @@ impl Interpreter {
                 callee,
                 paren,
                 arguments,
-            } => Ok(self.call_expr(*callee.clone(), paren.clone(), *arguments)?),
+            } => Ok(self.call_expr(*callee.clone(), paren.clone(), arguments.clone())?),
         }
     }
 }

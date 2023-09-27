@@ -16,3 +16,5 @@ printf "\n=== While Loop Test ===\n"
 ./target/release/rlok ./lang_tests/test_while_loop.lox
 printf "\n=== For Loop (Fibonacci) Test ===\n"
 ./target/release/rlok ./lang_tests/test_for_loop_fib.lox
+printf "\n=== Function Test ===\n"
+./target/release/rlok ./lang_tests/test_functions.lox

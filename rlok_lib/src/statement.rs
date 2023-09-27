@@ -30,6 +30,10 @@ pub enum Statement {
         params: Vec<Token>,
         body: Vec<Box<Statement>>,
     },
+    Return {
+        keyword: Token,
+        value: Expr,
+    },
 }
 
 impl std::fmt::Display for Statement {
@@ -63,6 +67,9 @@ impl std::fmt::Display for Statement {
                     "{{ function {} params {:?} body {:?} }}",
                     name, params, body
                 )
+            }
+            Statement::Return { keyword, value } => {
+                write!(f, "{{ keyword {} value {} }}", keyword, value)
             }
         }
     }

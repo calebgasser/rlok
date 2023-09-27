@@ -1,4 +1,5 @@
 use super::expression::Expr;
+use super::lit::LitType;
 use super::statement::Statement;
 use super::tokens::Token;
 use thiserror::Error;
