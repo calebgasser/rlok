@@ -1,5 +1,6 @@
 use super::expression::Expr;
 use super::tokens::Token;
+use std::fmt::{self, Write};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -39,9 +40,9 @@ pub enum Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Statement::Expression { expression } => write!(f, "{{ {} }}", expression),
-            Statement::Print { expression } => write!(f, "{{ print {} }}", expression),
-            Statement::Var { name, expression } => write!(f, "{{ {} = {:?} }}", name, expression),
+            Statement::Expression { expression } => write!(f, "{{ {:?} }}", expression),
+            Statement::Print { expression } => write!(f, "{{ print {:?} }}", expression),
+            Statement::Var { name, expression } => write!(f, "{{ {:?} = {:?} }}", name, expression),
             Statement::Block { statements } => write!(f, "{{ {:?} }}", statements),
             Statement::If {
                 condition,

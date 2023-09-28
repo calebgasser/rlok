@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 color-eyre = "0.6.2"
 rlok_lib = { path = "../rlok_lib"}
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"

@@ -11,7 +11,9 @@ use color_eyre::eyre::{Report, Result};
 use std::fs;
 use std::io;
 use std::io::Write;
+use tracing::{instrument, span, trace, Level};
 
+#[derive(Debug)]
 pub struct Interpreter {
     pub globals: Environment,
     pub environment: Environment,
@@ -19,8 +21,11 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
+    #[tracing::instrument]
     pub fn build() -> Self {
+        env_logger::init();
         let mut globals = Environment::new(None);
+        trace!("Starting Interpreter");
         globals.define(
             "clock".into(),
             LitType::Callable(LoxCallable::Clock(Clock::new("clock".into(), None))),
@@ -45,11 +50,12 @@ impl Interpreter {
     fn run(&mut self, contents: String) -> Result<()> {
         let mut scanner = Scanner::build(contents);
         let tokens = scanner.scan_tokens()?;
-        let mut parser = Parser::new(tokens.clone(), false)?;
+        let mut parser = Parser::new(tokens.clone())?;
         match parser.parse() {
             Ok(ast) => {
                 if let Some(ast) = ast {
                     for stmt in &ast {
+                        trace!("Processing statement.");
                         match self.evaluate_statement(stmt.clone()) {
                             Ok(output) => {
                                 if self.is_repl {
@@ -103,6 +109,7 @@ impl Interpreter {
     fn literal_expr(&self, expr: Expr) -> Result<LitType> {
         if let Expr::Literal { value } = expr.clone() {
             if let Some(val) = value {
+                trace!(value = %val, "Literal expression");
                 return Ok(val);
             }
         }
@@ -111,6 +118,7 @@ impl Interpreter {
 
     fn grouping_expr(&mut self, expr: Expr) -> Result<LitType> {
         if let Expr::Grouping { expression } = expr {
+            trace!(expr = %expression, "Grouping expression");
             return self.evaluate_expr(*expression);
         }
         Err(Report::new(RuntimeError::InvalidGrouping(expr)))
@@ -122,12 +130,19 @@ impl Interpreter {
             match operator.ty {
                 TokenType::Minus => {
                     if let LitType::Float(f) = right {
+                        trace!(value = f, "Unary expression");
                         return Ok(LitType::Float(-f));
                     }
                 }
                 TokenType::Bang => match right {
-                    LitType::Bool(b) => return Ok(LitType::Bool(!b)),
-                    LitType::Nil => return Ok(LitType::Bool(true)),
+                    LitType::Bool(b) => {
+                        trace!(value = b, "Unary expression");
+                        return Ok(LitType::Bool(!b));
+                    }
+                    LitType::Nil => {
+                        trace!(value = "Nil", "Unary expression");
+                        return Ok(LitType::Bool(true));
+                    }
                     _ => return Err(Report::new(RuntimeError::RighthandBoolorNil(expr))),
                 },
                 _ => return Err(Report::new(RuntimeError::UnaryExpects(expr))),
@@ -145,6 +160,7 @@ impl Interpreter {
         {
             let left = self.evaluate_expr(*left)?;
             let right = self.evaluate_expr(*right)?;
+            trace!(left = %left, operator = %operator.ty, right=%right, "Binary expression");
             if let LitType::Float(r) = right {
                 if let LitType::Float(l) = left {
                     match operator.ty {
@@ -183,10 +199,10 @@ impl Interpreter {
     }
 
     fn var_expr(&self, expr: Expr) -> Result<LitType> {
-        // println!("Environment: {:#?}", self.environment);
         match expr {
             Expr::Variable { name } => {
                 if let Some(val) = self.environment.get(name.clone())? {
+                    trace!(name = %name, val = %val, "Var expression");
                     return Ok(val);
                 }
                 return Err(Report::new(RuntimeError::UndefinedVariable(name.lexeme)));
@@ -197,6 +213,7 @@ impl Interpreter {
 
     fn logical_expr(&mut self, left: Expr, operator: TokenType, right: Expr) -> Result<LitType> {
         let left = self.evaluate_expr(left)?;
+        trace!(left = %left, "Logcial expression");
         if matches!(operator, TokenType::OR) {
             if Self::is_truthy(left.clone()) {
                 return Ok(left);
@@ -245,6 +262,7 @@ impl Interpreter {
     }
 
     fn while_statement(&mut self, condition: Expr, body: Statement) -> Result<()> {
+        trace!(condition = %condition, "While statement");
         while Self::is_truthy(self.evaluate_expr(condition.clone())?) {
             self.evaluate_statement(body.clone())?;
         }
@@ -257,6 +275,7 @@ impl Interpreter {
         then_condition: Statement,
         else_condition: Option<Statement>,
     ) -> Result<()> {
+        trace!(condition = %condition, "If statement");
         if Self::is_truthy(self.evaluate_expr(condition)?) {
             self.evaluate_statement(then_condition)?;
         } else {
@@ -270,6 +289,7 @@ impl Interpreter {
     fn var_statement(&mut self, stmt: Statement) -> Result<()> {
         if let Statement::Var { name, expression } = stmt.clone() {
             if let Some(expr) = expression {
+                trace!(name = %name, expr = %expr, "Var statement");
                 let value = self.evaluate_expr(expr)?;
                 self.environment.define(name.lexeme, value);
                 return Ok(());
@@ -283,12 +303,16 @@ impl Interpreter {
         &mut self,
         statements: Vec<Box<Statement>>,
         environment: Environment,
-    ) -> Result<()> {
+    ) -> Result<Option<LitType>> {
+        trace!("Block Statement");
         self.environment = environment;
         for stmt in statements {
-            self.evaluate_statement(*stmt)?;
+            trace!(statement = %stmt, "Processing statement in block");
+            if let Some(value) = self.evaluate_statement(*stmt)? {
+                return Ok(Some(value));
+            };
         }
-        Ok(())
+        Ok(None)
     }
 
     fn function_statement(
@@ -297,6 +321,7 @@ impl Interpreter {
         params: Vec<Token>,
         body: Vec<Box<Statement>>,
     ) -> Result<()> {
+        trace!(name = %name, "Function Statement");
         let stmt = Statement::Function {
             name: name.clone(),
             params,
@@ -311,6 +336,7 @@ impl Interpreter {
     }
 
     fn return_statement(&mut self, keyword: Token, value: Expr) -> Result<LitType> {
+        trace!(value = %value, "Return Statement");
         self.evaluate_expr(value)
     }
 
@@ -318,10 +344,12 @@ impl Interpreter {
         match stmt.clone() {
             Statement::Print { expression } => {
                 let value = self.evaluate_expr(expression)?;
+                trace!(value = %value, "Print lit statement");
                 Self::print_lit(value);
                 Ok(None)
             }
             Statement::Expression { expression } => {
+                trace!("Evaluating expression");
                 return Ok(Some(self.evaluate_expr(expression)?));
             }
             Statement::Var {
@@ -332,11 +360,10 @@ impl Interpreter {
                 return Ok(None);
             }
             Statement::Block { statements } => {
-                self.block_statement(
+                return Ok(self.block_statement(
                     statements,
                     Environment::new(Some(Box::new(self.environment.clone()))),
-                )?;
-                Ok(None)
+                )?);
             }
             Statement::If {
                 condition,
@@ -359,8 +386,7 @@ impl Interpreter {
                 Ok(None)
             }
             Statement::Return { keyword, value } => {
-                self.return_statement(keyword, value)?;
-                Ok(None)
+                return Ok(Some(self.return_statement(keyword, value)?));
             }
         }
     }
@@ -401,6 +427,7 @@ impl Interpreter {
                             arguments.len(),
                         )));
                     }
+                    trace!(callee = func.as_string(), "Calling function");
                     return Ok(func.call(self, arguments)?);
                 }
                 LoxCallable::Clock(clock) => {

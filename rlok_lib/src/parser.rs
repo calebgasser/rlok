@@ -4,20 +4,17 @@ use super::lit::LitType;
 use super::statement::Statement;
 use super::tokens::{Token, TokenType};
 use color_eyre::eyre::{Report, Result};
+use tracing::{event, trace, Level};
 
+#[derive(Debug)]
 pub struct Parser {
     tokens: Vec<Token>,
     current: i32,
-    debug: bool,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>, debug: bool) -> Result<Self> {
-        Ok(Parser {
-            tokens,
-            current: 0,
-            debug,
-        })
+    pub fn new(tokens: Vec<Token>) -> Result<Self> {
+        Ok(Parser { tokens, current: 0 })
     }
 
     fn peek(&self) -> Token {
@@ -71,14 +68,12 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Option<Vec<Statement>>> {
+        trace!("Begine parsing...");
         let mut statements: Vec<Statement> = Vec::new();
         while !self.is_end() {
             match self.declaration() {
                 Ok(declaration) => {
                     if let Some(dec) = declaration {
-                        if self.debug {
-                            println!("{:#?}", dec);
-                        }
                         statements.push(dec.clone())
                     }
                 }
@@ -91,6 +86,7 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "Declaration");
         if self.match_type(vec![TokenType::FUN]) {
             return Ok(Some(self.function_declaration("function".into())?));
         } else if self.match_type(vec![TokenType::VAR]) {
@@ -101,6 +97,7 @@ impl Parser {
     }
 
     fn function_declaration(&mut self, kind: String) -> Result<Statement> {
+        event!(Level::TRACE, token = %self.peek(), "Function declaration");
         let name = self.consume(TokenType::Ident, &format!("Expect {} name.", kind))?;
         let _ = self.consume(
             TokenType::LeftParen,
@@ -132,6 +129,7 @@ impl Parser {
         })
     }
     fn var_declaration(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "Variable declaration");
         let name = self.consume(TokenType::Ident, "Expected variable name.")?;
         if self.match_type(vec![TokenType::Equal]) {
             if let Some(expr) = self.expression()? {
@@ -159,6 +157,7 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "Statement processing");
         if self.match_type(vec![TokenType::LeftBrace]) {
             return Ok(Some(Statement::Block {
                 statements: self.block_statement()?,
@@ -179,6 +178,7 @@ impl Parser {
     }
 
     fn return_statement(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "Return statement");
         let keyword = self.previous();
         if !self.match_type(vec![TokenType::Semicolon]) {
             if let Some(value) = self.expression()? {
@@ -190,6 +190,7 @@ impl Parser {
     }
 
     fn for_statement(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "For statement");
         let _ = self.consume(TokenType::LeftParen, "Expected '(' after 'for'.");
         let initializer: Option<Statement>;
         let mut condition: Option<Expr> = None;
@@ -257,6 +258,7 @@ impl Parser {
     }
 
     fn while_statement(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "While statement");
         let _ = self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         if let Some(condition) = self.expression()? {
             let _ = self.consume(TokenType::RightParen, "Expected ')' after condition.");
@@ -274,6 +276,7 @@ impl Parser {
     }
 
     fn if_statement(&mut self) -> Result<Statement> {
+        trace!(token = %self.peek(), "If statement");
         let _ = self.consume(TokenType::LeftParen, "Expected '(' after 'if'.");
         if let Some(condition) = self.expression()? {
             let _ = self.consume(TokenType::RightParen, "Expected ')' after if condition.");
@@ -302,6 +305,7 @@ impl Parser {
     }
 
     fn block_statement(&mut self) -> Result<Vec<Box<Statement>>> {
+        trace!(token = %self.peek(), "Block statement");
         let mut statements: Vec<Box<Statement>> = Vec::new();
         while !self.check(TokenType::RightBrace) && !self.is_end() {
             if let Some(dec) = self.declaration()? {
@@ -313,6 +317,7 @@ impl Parser {
     }
 
     fn print_statement(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "Print statement");
         if let Some(expr) = self.expression()? {
             let _ = self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
             return Ok(Some(Statement::Print { expression: expr }));
@@ -321,6 +326,7 @@ impl Parser {
     }
 
     fn expression_statement(&mut self) -> Result<Option<Statement>> {
+        trace!(token = %self.peek(), "Expression statement");
         if let Some(expr) = self.expression()? {
             let _ = self.consume(
                 TokenType::Semicolon,
@@ -331,9 +337,9 @@ impl Parser {
         Ok(None)
     }
 
-    // expression     → comma ;
     fn expression(&mut self) -> Result<Option<Expr>> {
         if let Some(expr) = self.assignment()? {
+            trace!(token = %self.peek(), "Expression");
             return Ok(Some(expr));
         }
         Ok(None)
@@ -351,6 +357,7 @@ impl Parser {
                                 "Expect ';' after variable assignment.",
                             )?;
                         }
+                        trace!(name = %name, value = %value, "Assignment");
                         return Ok(Some(Expr::Assign {
                             name,
                             value: Box::new(value),
@@ -370,6 +377,7 @@ impl Parser {
             while self.match_type(vec![TokenType::OR]) {
                 let operator = self.previous();
                 if let Some(right) = self.logic_and()? {
+                    trace!(expr = %expr, operator.lexeme, right = %right, "Logic OR");
                     return Ok(Some(Expr::Logcial {
                         left: Box::new(expr),
                         operator,
@@ -388,6 +396,7 @@ impl Parser {
             while self.match_type(vec![TokenType::AND]) {
                 let operator = self.previous();
                 if let Some(right) = self.equality()? {
+                    trace!(expr = %expr, operator.lexeme, right = %right, "Logic AND");
                     return Ok(Some(Expr::Logcial {
                         left: Box::new(expr),
                         operator,
@@ -406,6 +415,7 @@ impl Parser {
             while self.match_type(vec![TokenType::BangEqual, TokenType::EqualEqual]) {
                 let operator = self.previous();
                 if let Some(right) = self.comparison()? {
+                    trace!(expr = %expr, operator.lexeme, right = %right, "Binary");
                     return Ok(Some(Expr::Binary {
                         left: Box::new(expr),
                         operator,
@@ -428,6 +438,7 @@ impl Parser {
             ]) {
                 let operator = self.previous();
                 if let Some(right) = self.term()? {
+                    trace!(expr = %expr, operator.lexeme, right = %right, "Comparison");
                     expr = Expr::Binary {
                         left: Box::new(expr),
                         operator,
@@ -445,6 +456,7 @@ impl Parser {
             while self.match_type(vec![TokenType::Minus, TokenType::Plus]) {
                 let operator = self.previous();
                 if let Some(right) = self.factor()? {
+                    trace!(expr = %expr, operator.lexeme, right = %right, "Term");
                     expr = Expr::Binary {
                         left: Box::new(expr),
                         operator,
@@ -462,6 +474,7 @@ impl Parser {
             while self.match_type(vec![TokenType::Slash, TokenType::Star]) {
                 let operator = self.previous();
                 if let Some(right) = self.unary()? {
+                    trace!(expr = %expr, operator.lexeme, right = %right, "Factor");
                     expr = Expr::Binary {
                         left: Box::new(expr),
                         operator,
@@ -480,6 +493,7 @@ impl Parser {
             if self.match_type(vec![TokenType::Bang, TokenType::Minus]) {
                 let operator = self.previous();
                 if let Some(right) = self.unary()? {
+                    trace!(operator.lexeme, right = %right, "Unary");
                     expr = Expr::Unary {
                         operator,
                         right: Box::new(right),
@@ -500,12 +514,14 @@ impl Parser {
                     break;
                 }
             }
+            trace!(expr = %expr, "Call");
             return Ok(Some(expr));
         }
         Ok(None)
     }
 
     fn finish_call(&mut self, expr: Expr) -> Result<Expr> {
+        trace!(token = %self.peek(), "Finish Call");
         let mut arguments = Vec::new();
         if !self.check(TokenType::RightParen) {
             loop {
@@ -521,7 +537,6 @@ impl Parser {
             }
         }
         let paren = self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
-        // let _ = self.consume(TokenType::Semicolon, "Expected ';' after function call.")?;
         return Ok(Expr::Call {
             callee: Box::new(expr),
             paren,
@@ -530,6 +545,7 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Option<Expr>> {
+        trace!(token = %self.peek(), "Primary");
         if self.match_type(vec![TokenType::FALSE]) {
             return Ok(Some(Expr::Literal {
                 value: Some(LitType::Bool(false)),
