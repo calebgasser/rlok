@@ -15,7 +15,14 @@ impl std::fmt::Display for LitType {
             LitType::Float(flt) => write!(f, "{}", flt),
             LitType::Str(str) => write!(f, "{}", str),
             LitType::Bool(bl) => write!(f, "{}", bl),
-            LitType::Callable(call) => write!(f, "{:?}", call),
+            LitType::Callable(call) => match call {
+                LoxCallable::Function(func) => {
+                    write!(f, "{:?}", func)
+                }
+                LoxCallable::Clock(clock) => {
+                    write!(f, "{:?}", clock)
+                }
+            },
             LitType::Nil => write!(f, "nil"),
         }
     }

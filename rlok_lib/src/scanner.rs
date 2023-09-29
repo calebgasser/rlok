@@ -218,8 +218,13 @@ impl Scanner {
                 }
             }
             '"' => self.string()?,
-            ' ' | '\r' | '\t' => (),
-            '\n' => self.line += 1,
+            ' ' => self.add_token(TokenType::Space),
+            '\r' => self.add_token(TokenType::CarriageReturn),
+            '\t' => self.add_token(TokenType::Tab),
+            '\n' => {
+                self.add_token(TokenType::NewLine);
+                self.line += 1;
+            }
             _ => {
                 if Self::is_digit(c) {
                     self.number();

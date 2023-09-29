@@ -6,5 +6,6 @@ mod lit;
 mod lox_callable;
 mod parser;
 mod scanner;
+mod span;
 mod statement;
 mod tokens;

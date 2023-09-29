@@ -6,7 +6,7 @@ use super::lit::LitType;
 use super::statement::Statement;
 use color_eyre::eyre::{Report, Result};
 use std::time::SystemTime;
-use tracing::{instrument, trace};
+use tracing::trace;
 
 #[derive(Debug, Clone)]
 pub enum LoxCallable {
@@ -14,7 +14,19 @@ pub enum LoxCallable {
     Clock(Clock),
 }
 
-pub trait Callable: std::fmt::Debug {
+impl std::fmt::Display for LoxCallable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LoxCallable::Function(func) => {
+                write!(f, "{:?}", func)
+            }
+            LoxCallable::Clock(clock) => {
+                write!(f, "{:?}", clock)
+            }
+        }
+    }
+}
+pub trait Callable: std::fmt::Debug + std::fmt::Display {
     fn new(callee: String, declaration: Option<Statement>) -> Self;
     fn callee(&self) -> String;
     fn call(&self, inter: &mut Interpreter, arguments: Vec<Box<Expr>>) -> Result<LitType>;
@@ -84,11 +96,18 @@ impl Callable for LoxFunction {
     }
 
     fn call(&self, inter: &mut Interpreter, arguments: Vec<Box<Expr>>) -> Result<LitType> {
-        let mut environment = Environment::new(Some(Box::new(inter.globals.clone())));
+        let mut environment = Environment::new(Some(Box::new(inter.environment.clone())));
         if let Some(declaration) = *self.declaration.clone() {
-            if let Statement::Function { name, params, body } = declaration.clone() {
+            if let Statement::Function {
+                span: _,
+                name,
+                params,
+                body,
+            } = declaration.clone()
+            {
                 trace!(name = %name, "Called function");
                 for (index, param) in params.iter().enumerate() {
+                    trace!(param = %param, index, "parameter");
                     environment.define(
                         param.lexeme.clone(),
                         inter.evaluate_expr(*arguments[index].clone())?,
@@ -99,7 +118,12 @@ impl Callable for LoxFunction {
                 }
             }
 
-            if let Statement::Return { keyword: _, value } = declaration.clone() {
+            if let Statement::Return {
+                span: _,
+                keyword: _,
+                value,
+            } = declaration.clone()
+            {
                 return inter.evaluate_expr(value);
             }
         }
@@ -110,6 +134,7 @@ impl Callable for LoxFunction {
     fn arity(&self) -> usize {
         if let Some(dec) = *self.declaration.clone() {
             if let Statement::Function {
+                span: _,
                 name: _,
                 params,
                 body: _,
@@ -124,6 +149,7 @@ impl Callable for LoxFunction {
     fn as_string(&self) -> String {
         if let Some(dec) = *self.declaration.clone() {
             if let Statement::Function {
+                span: _,
                 name,
                 params: _,
                 body: _,

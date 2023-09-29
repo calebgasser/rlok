@@ -3,7 +3,7 @@ use super::lit::LitType;
 use super::tokens::Token;
 use color_eyre::eyre::{Report, Result};
 use std::collections::HashMap;
-use tracing::trace;
+use tracing::{span, trace, Level};
 
 #[derive(Clone, Debug)]
 pub struct Environment {
@@ -21,36 +21,51 @@ impl Environment {
     }
 
     pub fn define(&mut self, name: String, value: LitType) {
+        let span_trace = span!(Level::TRACE, "env define");
+        let _enter = span_trace.enter();
         self.values.insert(name, value);
         trace!(env = %self, "Environment Define");
     }
 
-    pub fn get(&self, token: Token) -> Result<Option<LitType>> {
+    pub fn get(&self, token: Token, span: String) -> Result<Option<LitType>> {
+        let span_trace = span!(Level::TRACE, "env get");
+        let _enter = span_trace.enter();
         if self.values.contains_key(&token.lexeme) {
             if let Some(val) = self.values.get(&token.lexeme) {
-                trace!(get = %token, val = %val.clone(), env = %self,"Environment Get");
+                trace!(get = %token);
                 return Ok(Some(val.clone()));
             }
-        } else if let Some(ref enc) = self.enclosing {
-            trace!(get = %token, enclosing = %enc, "Environment Enclosing Get");
-            return Ok(enc.get(token.clone())?);
         }
-        Err(Report::new(RuntimeError::UndefinedVariable(token.lexeme)))
+        if let Some(ref enc) = self.enclosing {
+            let span_trace = span!(Level::TRACE, "enclosing");
+            let _enter = span_trace.enter();
+            return Ok(enc.get(token.clone(), span)?);
+        }
+        Err(Report::new(RuntimeError::UndefinedVariable(
+            token.lexeme,
+            span,
+        )))
     }
 
-    pub fn assign(&mut self, name: Token, value: LitType) -> Result<()> {
+    pub fn assign(&mut self, name: Token, value: LitType, span: String) -> Result<()> {
+        let span_trace = span!(Level::TRACE, "env assign");
+        trace!(env = %self);
+        let _enter = span_trace.enter();
         if self.values.contains_key(&name.lexeme) {
             self.values.insert(name.lexeme.clone(), value.clone());
-            trace!(env = %self, "Environment Assign");
             trace!(name = %name.lexeme, value = %value);
             return Ok(());
-        } else if let Some(ref mut enc) = self.enclosing {
-            enc.assign(name.clone(), value.clone())?;
-            trace!(encolsing = %enc, "Environment Enclosing Assign");
-            trace!(name = %name, value = %value);
+        }
+        if let Some(ref mut enc) = self.enclosing {
+            let span_trace = span!(Level::TRACE, "enclosing");
+            let _enter = span_trace.enter();
+            enc.assign(name.clone(), value.clone(), span)?;
             return Ok(());
         }
-        Err(Report::new(RuntimeError::UndefinedVariable(name.lexeme)))
+        Err(Report::new(RuntimeError::UndefinedVariable(
+            name.lexeme,
+            span,
+        )))
     }
 }
 
@@ -60,11 +75,11 @@ impl std::fmt::Display for Environment {
             .values
             .clone()
             .into_iter()
-            .fold(String::from(""), |acc, (k, v)| {
+            .fold(String::new(), |acc, (k, v)| {
                 if acc.len() > 0 {
-                    format!("{}, {:?}={:?}", acc, k, v)
+                    format!("{}, {:?} = {:?}", acc, k, v)
                 } else {
-                    format!("{}={:?}", k, v)
+                    format!("{:?} = {:?}", k, v)
                 }
             });
         write!(f, "{}", output)

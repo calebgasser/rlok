@@ -1,5 +1,4 @@
 use super::expression::Expr;
-use super::lit::LitType;
 use super::statement::Statement;
 use super::tokens::Token;
 use thiserror::Error;
@@ -86,8 +85,8 @@ pub enum RuntimeError {
     BinaryTypeMismatch(Expr),
     #[error("[Error] [Runtime] [InvalidBinaryExpr] {0}")]
     InvalidBinaryExpr(Expr),
-    #[error("[Error] [Runtime] Variable is undefined: {0}")]
-    UndefinedVariable(String),
+    #[error("[Error] [Runtime] Variable is undefined: {0} {1}")]
+    UndefinedVariable(String, String),
     #[error("[Error] [Runtime] Expression is not a variable: {0}")]
     ExpressionNotVariable(Expr),
     #[error("[Error] [Runtime] Statement missing expression: {0}")]

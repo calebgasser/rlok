@@ -1,9 +1,12 @@
 use std::fmt::{self, Write};
-use tracing::field::{Field, Value, Visit};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     // Signel-character tokens
+    NewLine,
+    CarriageReturn,
+    Tab,
+    Space,
     LeftParen,
     RightParen,
     LeftBrace,
@@ -76,6 +79,10 @@ impl Token {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            TokenType::NewLine => write!(f, "<newline>"),
+            TokenType::Space => write!(f, "<space>"),
+            TokenType::Tab => write!(f, "<tab>"),
+            TokenType::CarriageReturn => write!(f, "<CR>"),
             TokenType::LeftParen => write!(f, ")"),
             TokenType::RightParen => write!(f, "("),
             TokenType::LeftBrace => write!(f, "{{"),
@@ -121,6 +128,6 @@ impl std::fmt::Display for TokenType {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.lexeme)
+        write!(f, "{}", self.lexeme)
     }
 }
