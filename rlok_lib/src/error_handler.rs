@@ -1,4 +1,5 @@
 use super::expression::Expr;
+use super::lit::LitType;
 use super::statement::Statement;
 use super::tokens::Token;
 use thiserror::Error;
@@ -59,6 +60,8 @@ pub enum ScannerError {
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
+    #[error("return")]
+    Return(LitType),
     #[error("[Error] [Runtime] [NativeFunctionError] Error calling native function")]
     NativeFunctionError,
     #[error("[Error] [Runtime] [IncorrectArgumentCount] Expected {0} arguments but got {1}.")]

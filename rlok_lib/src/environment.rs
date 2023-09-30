@@ -21,24 +21,18 @@ impl Environment {
     }
 
     pub fn define(&mut self, name: String, value: LitType) {
-        let span_trace = span!(Level::TRACE, "env define");
-        let _enter = span_trace.enter();
         self.values.insert(name, value);
         trace!(env = %self, "Environment Define");
     }
 
     pub fn get(&self, token: Token, span: String) -> Result<Option<LitType>> {
-        let span_trace = span!(Level::TRACE, "env get");
-        let _enter = span_trace.enter();
         if self.values.contains_key(&token.lexeme) {
             if let Some(val) = self.values.get(&token.lexeme) {
-                trace!(get = %token);
+                trace!(get = %token, "Environment Get");
                 return Ok(Some(val.clone()));
             }
         }
         if let Some(ref enc) = self.enclosing {
-            let span_trace = span!(Level::TRACE, "enclosing");
-            let _enter = span_trace.enter();
             return Ok(enc.get(token.clone(), span)?);
         }
         Err(Report::new(RuntimeError::UndefinedVariable(
@@ -48,17 +42,12 @@ impl Environment {
     }
 
     pub fn assign(&mut self, name: Token, value: LitType, span: String) -> Result<()> {
-        let span_trace = span!(Level::TRACE, "env assign");
-        trace!(env = %self);
-        let _enter = span_trace.enter();
         if self.values.contains_key(&name.lexeme) {
             self.values.insert(name.lexeme.clone(), value.clone());
-            trace!(name = %name.lexeme, value = %value);
+            trace!(name = %name.lexeme, value = %value, "Environment Assign");
             return Ok(());
         }
         if let Some(ref mut enc) = self.enclosing {
-            let span_trace = span!(Level::TRACE, "enclosing");
-            let _enter = span_trace.enter();
             enc.assign(name.clone(), value.clone(), span)?;
             return Ok(());
         }
@@ -71,17 +60,32 @@ impl Environment {
 
 impl std::fmt::Display for Environment {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let output = self
-            .values
-            .clone()
-            .into_iter()
-            .fold(String::new(), |acc, (k, v)| {
-                if acc.len() > 0 {
-                    format!("{}, {:?} = {:?}", acc, k, v)
+        fn get_enclosing(env: &Environment) -> String {
+            let mut values = String::new();
+            if env.values.len() > 0 {
+                values = env
+                    .values
+                    .clone()
+                    .into_iter()
+                    .fold(String::new(), |acc, (k, v)| {
+                        if acc.len() > 0 {
+                            format!("{}, {:?} = {:?}", acc, k, v)
+                        } else {
+                            format!("{:?} = {:?}", k, v)
+                        }
+                    });
+            }
+            if let Some(ref enc) = env.enclosing {
+                let last_val = get_enclosing(enc);
+                if values.len() > 0 {
+                    return format!("{}, {}", values, last_val);
                 } else {
-                    format!("{:?} = {:?}", k, v)
+                    return format!("{}", last_val);
                 }
-            });
-        write!(f, "{}", output)
+            } else {
+                return values;
+            }
+        }
+        write!(f, "{}", get_enclosing(self))
     }
 }

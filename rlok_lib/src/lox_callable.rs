@@ -96,7 +96,7 @@ impl Callable for LoxFunction {
     }
 
     fn call(&self, inter: &mut Interpreter, arguments: Vec<Box<Expr>>) -> Result<LitType> {
-        let mut environment = Environment::new(Some(Box::new(inter.environment.clone())));
+        let mut environment = Environment::new(Some(Box::new(inter.globals.clone())));
         if let Some(declaration) = *self.declaration.clone() {
             if let Statement::Function {
                 span: _,
@@ -113,22 +113,22 @@ impl Callable for LoxFunction {
                         inter.evaluate_expr(*arguments[index].clone())?,
                     );
                 }
-                if let Some(result) = inter.block_statement(body, environment)? {
-                    return Ok(result);
+                match inter.block_statement(body, environment) {
+                    Ok(_) => return Ok(LitType::Nil),
+                    Err(err) => {
+                        let error: Report = err;
+                        if let Some(err) = error.root_cause().downcast_ref::<RuntimeError>() {
+                            if let RuntimeError::Return(val) = err {
+                                trace!(val = %val.clone(), "Returning");
+                                return Ok(val.clone());
+                            }
+                        }
+                        return Err(error);
+                    }
                 }
             }
-
-            if let Statement::Return {
-                span: _,
-                keyword: _,
-                value,
-            } = declaration.clone()
-            {
-                return inter.evaluate_expr(value);
-            }
         }
-        println!("Returning nill");
-        Ok(LitType::Nil)
+        return Ok(LitType::Nil);
     }
 
     fn arity(&self) -> usize {

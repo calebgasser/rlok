@@ -6,7 +6,7 @@ use tracing_subscriber::FmtSubscriber;
 
 fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::ERROR)
+        .with_max_level(Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     color_eyre::install()?;

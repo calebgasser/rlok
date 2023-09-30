@@ -304,14 +304,17 @@ impl Interpreter {
         }
     }
 
-    fn while_statement(&mut self, condition: Expr, body: Statement) -> Result<()> {
+    fn while_statement(&mut self, condition: Expr, body: Statement) -> Result<Option<LitType>> {
         let span = span!(Level::TRACE, "while statement");
         let _enter = span.enter();
-        trace!(condition = %condition);
         while Self::is_truthy(self.evaluate_expr(condition.clone())?) {
-            self.evaluate_statement(body.clone())?;
+            trace!(body = %body, "While...");
+            let output = self.evaluate_statement(body.clone())?;
+            if let Some(output) = output {
+                return Ok(Some(output));
+            }
         }
-        Ok(())
+        Ok(None)
     }
 
     fn if_statement(
@@ -319,18 +322,16 @@ impl Interpreter {
         condition: Expr,
         then_condition: Statement,
         else_condition: Option<Statement>,
-    ) -> Result<()> {
+    ) -> Result<Option<LitType>> {
         let span = span!(Level::TRACE, "if statement");
         let _enter = span.enter();
         trace!(condition = %condition);
         if Self::is_truthy(self.evaluate_expr(condition)?) {
-            self.evaluate_statement(then_condition)?;
-        } else {
-            if let Some(els) = else_condition {
-                self.evaluate_statement(els)?;
-            }
+            return self.evaluate_statement(then_condition);
+        } else if let Some(els) = else_condition {
+            return self.evaluate_statement(els);
         }
-        Ok(())
+        Ok(None)
     }
 
     fn var_statement(&mut self, stmt: Statement) -> Result<()> {
@@ -358,13 +359,13 @@ impl Interpreter {
         statements: Vec<Box<Statement>>,
         environment: Environment,
     ) -> Result<Option<LitType>> {
+        let span_trace = span!(Level::TRACE, "b>");
+        let _enter = span_trace.enter();
         self.environment = environment;
+        trace!(env = %self.environment, "Starting block statement");
         for stmt in statements {
             trace!(statement = %stmt, "Processing statement in block");
-            if let Some(value) = self.evaluate_statement(*stmt)? {
-                trace!(value = %value, "Statement evaluted.");
-                return Ok(Some(value));
-            };
+            self.evaluate_statement(*stmt.clone())?;
         }
         Ok(None)
     }
@@ -397,7 +398,9 @@ impl Interpreter {
         let span = span!(Level::TRACE, "return statement");
         let _enter = span.enter();
         trace!(value = %value);
-        self.evaluate_expr(value)
+        Err(Report::new(RuntimeError::Return(
+            self.evaluate_expr(value)?,
+        )))
     }
 
     fn evaluate_statement(&mut self, stmt: Statement) -> Result<Option<LitType>> {
@@ -441,19 +444,17 @@ impl Interpreter {
                 else_branch,
             } => {
                 if let Some(els) = else_branch {
-                    self.if_statement(condition, *then_branch, Some(*els))?;
+                    return self.if_statement(condition, *then_branch, Some(*els));
                 } else {
-                    self.if_statement(condition, *then_branch, None)?;
+                    return self.if_statement(condition, *then_branch, None);
                 }
-                Ok(None)
             }
             Statement::While {
                 span: _,
                 condition,
                 body,
             } => {
-                self.while_statement(condition, *body)?;
-                Ok(None)
+                return self.while_statement(condition, *body);
             }
             Statement::Function {
                 span,
@@ -485,8 +486,9 @@ impl Interpreter {
                 return Ok(val.clone());
             }
         } else {
-            let span_tracing = span!(Level::TRACE, "assign expression");
+            let span_tracing = span!(Level::TRACE, "assign expression eval");
             let _enter = span_tracing.enter();
+            trace!(value = %value.clone());
             let val = self.evaluate_expr(value.clone())?;
             trace!(name = %name.clone(), value = %val.clone(), "assigning");
             self.environment
